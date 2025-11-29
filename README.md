@@ -32,7 +32,8 @@ The material is organized into the following modules. You can start reading from
 | **09** | [Geometric Methods for PDEs](chapter09.html) | 🚧 Placeholder |
 | **10** | [Applications (HMC, Quantum, N-Body)](chapter10.html) | 🚧 Placeholder |
 | **11** | [Advanced Topics](chapter11.html) | 🚧 Placeholder |
-| **12** | [Appendix: Mathematical Tools](chapter12.html) | 🚧 Placeholder |
+| **12** | [Appendix A: Mathematical Tools](chapter12.html) | 🚧 Placeholder |
+| **App** | [Appendix B: Brachistodynamic Holonomy](appendix_bdh.html) | ✅ Complete |
 
 ## 🚀 Key Features
 
