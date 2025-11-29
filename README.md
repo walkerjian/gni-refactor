@@ -44,8 +44,8 @@ The material is organized into the following modules. You can start reading from
 ## 🛠️ Usage
 
 ### Option 1: View Online (Recommended)
-Once GitHub Pages is enabled, you can view the rendered book here:
-**[https://walkerjian.github.io/gni-refactor/toc.html](https://walkerjian.github.io/gni-refactor/toc.html)**
+Once GitHub Pages is enabled and DNS propagates, you can view the rendered book here:
+**[https://gni.walkerjian.com/toc.html](https://gni.walkerjian.com/toc.html)**
 
 ### Option 2: Run Locally
 ```bash
