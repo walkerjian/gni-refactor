@@ -42,8 +42,11 @@ The material is organized into the following modules. You can start reading from
 
 ## 🛠️ Usage
 
-Simply open `toc.html` in your web browser to begin.
+### Option 1: View Online (Recommended)
+Once GitHub Pages is enabled, you can view the rendered book here:
+**[https://walkerjian.github.io/gni-refactor/toc.html](https://walkerjian.github.io/gni-refactor/toc.html)**
 
+### Option 2: Run Locally
 ```bash
 # Clone the repository
 git clone https://github.com/walkerjian/gni-refactor.git
@@ -51,6 +54,14 @@ git clone https://github.com/walkerjian/gni-refactor.git
 # Open the Table of Contents
 open toc.html
 ```
+
+## ⚙️ Setup GitHub Pages
+To view the rendered HTML on GitHub:
+1. Go to **Settings** > **Pages** in your repository.
+2. Under **Source**, select `Deploy from a branch`.
+3. Under **Branch**, select `main` and `/ (root)`.
+4. Click **Save**.
+
 
 ---
 *Maintained by [walkerjian](https://github.com/walkerjian)*
