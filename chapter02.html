@@ -1,0 +1,2751 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 2 - Geometric Numerical Integration</title>
+    <style>
+        body {
+            font-family: serif;
+            line-height: 1.5;
+            margin: 2em;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: Georgia, serif;
+        }
+
+        code {
+            background: #eee;
+            padding: 2px 4px;
+        }
+
+        .task {
+            color: #777;
+            font-style: italic;
+        }
+
+        a {
+            text-decoration: none;
+            color: #006;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>2. Symplectic Geometry and Hamiltonian Dynamics</h1>
+    <nav style="background:#eee; padding:0.5em; margin-bottom:1em;">
+        <a href="chapter01.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a
+            href="chapter03.html">Next</a>
+    </nav>
+    <hr /><section id="sec-2-1">
+  <h2>2.1 Symplectic Manifolds</h2>
+
+  <p>
+    Symplectic geometry provides the natural mathematical framework for Hamiltonian
+    mechanics. In geometric numerical integration, the primary objective of a
+    <strong>symplectic integrator</strong> is to preserve the underlying symplectic
+    structure of the continuous system at the discrete level.
+  </p>
+
+  <p>
+    This section formally introduces symplectic manifolds, symplectic forms,
+    canonical coordinates, Darboux charts, and key structural identities.
+    These concepts are foundational for Sections 2.2–2.3 and for all later
+    Hamiltonian geometric integrators.
+  </p>
+
+  <hr/>
+
+  <!-- 2.1.1 -->
+  <h3 id="sec-2-1-1">2.1.1 Differential Forms and Alternating Bilinear Structures</h3>
+
+  <p>
+    Let \(M\) be a smooth manifold of even dimension \(2m\).
+    A <strong>2-form</strong> on \(M\) is a smooth function assigning to each
+    \(x\in M\) an alternating bilinear form
+  </p>
+
+  <p class="math">\[
+      \omega_x : T_xM \times T_xM \to \mathbb{R}, \qquad
+      \omega_x(u,v) = -\omega_x(v,u).
+  \]</p>
+
+  <p>
+    A 2-form is called <em>non-degenerate</em> if
+  </p>
+
+  <p class="math">\[
+      \forall x\in M: \quad \omega_x(u,\cdot)=0 \implies u=0.
+  \]</p>
+
+  <p>
+    Non-degeneracy implies that the linear map
+  </p>
+
+  <p class="math">\[
+      T_xM \to T_x^*M, \qquad 
+      u \mapsto \omega_x(u,\cdot)
+    \]</p>
+
+  <p>
+    is an isomorphism; hence \(\dim M\) must be even.
+  </p>
+
+  <p>
+    The <strong>exterior derivative</strong> of a 2-form \(\omega\) is a 3-form
+    \(d\omega\); the condition \(d\omega = 0\) is called <em>closedness</em>.
+  </p>
+
+  <figure id="fig-2-1" style="text-align:center;">
+    <svg width="420" height="200" style="border:1px solid #ccc;">
+      <text x="10" y="20" font-size="14">
+        Alternating form ωₓ(u,v)
+      </text>
+      <!-- Basis vectors -->
+      <line x1="200" y1="150" x2="260" y2="80"
+            stroke="#006" stroke-width="2" marker-end="url(#arr1)"/>
+      <line x1="200" y1="150" x2="140" y2="80"
+            stroke="#900" stroke-width="2" marker-end="url(#arr2)"/>
+
+      <text x="265" y="75" font-size="12">u</text>
+      <text x="120" y="75" font-size="12">v</text>
+
+      <!-- Area "parallelogram" -->
+      <polygon points="200,150 260,80 320,150"
+               fill="rgba(0,100,255,0.1)" stroke="#00f" stroke-width="1"/>
+
+      <defs>
+        <marker id="arr1" markerWidth="12" markerHeight="12" refX="5" refY="6"
+                orient="auto">
+          <path d="M0,0 L0,12 L12,6 z" fill="#006"/>
+        </marker>
+        <marker id="arr2" markerWidth="12" markerHeight="12" refX="5" refY="6"
+                orient="auto">
+          <path d="M0,0 L0,12 L12,6 z" fill="#900"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>
+      <strong>Figure 2.1</strong> – In each tangent space the 2-form
+      \( \omega_x(u,v) \) measures a signed “symplectic area”.
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 2.1.2 -->
+  <h3 id="sec-2-1-2">2.1.2 Symplectic Manifolds: Definitions</h3>
+
+  <p><strong>Definition 2.1 (Symplectic manifold).</strong>
+    A pair \( (M, \omega) \) is called a <em>symplectic manifold</em> if:
+  </p>
+
+  <ol>
+    <li>\( \omega \) is a smooth 2-form on \(M\),</li>
+    <li>\( \omega \) is <strong>non-degenerate</strong>,</li>
+    <li>\( \omega \) is <strong>closed</strong>: \( d\omega = 0 \).</li>
+  </ol>
+
+  <p>
+    A symplectic manifold is necessarily even-dimensional, but <em>unlike Riemannian
+    manifolds it has no preferred notion of length or angle</em>.  It is purely
+    “area-based”.
+  </p>
+
+  <h4>Canonical example (ℝ<sup>2m</sup> with standard ω)</h4>
+
+  <p class="math">\[
+      \omega_0 = \sum_{i=1}^m dq_i \wedge dp_i
+      = dq_1\wedge dp_1 + \cdots + dq_m\wedge dp_m.
+  \]</p>
+
+  <p>
+    In matrix form, writing \( z=(q,p) = (q_1,\dots,q_m,p_1,\dots,p_m) \),
+    \(\omega_0(u,v) = u^\top \Omega v\), where
+  </p>
+
+  <p class="math">\[
+      \Omega = \begin{pmatrix}
+        0 & I_m\\
+        -I_m & 0
+      \end{pmatrix}.
+    \]</p>
+
+  <p>
+    This will be the prototype for numerical symplecticity in later chapters.
+  </p>
+
+  <hr/>
+
+  <!-- 2.1.3 -->
+  <h3 id="sec-2-1-3">2.1.3 Darboux Theorem: All Symplectic Manifolds Look Locally Canonical</h3>
+
+  <p><strong>Theorem 2.1 (Darboux, 1882).</strong>
+    Let \( (M,\omega) \) be a symplectic manifold.  
+    For every point \(x_0\in M\), there exists a neighbourhood \(U\) and local
+    coordinates
+  </p>
+
+  <p class="math">\[
+      (q_1,\dots,q_m,p_1,\dots,p_m): U \to \mathbb{R}^{2m}
+  \]</p>
+
+  <p>
+    such that, in these coordinates,
+  </p>
+
+  <p class="math">\[
+      \omega = \sum_{i=1}^m dq_i \wedge dp_i.
+    \]</p>
+
+  <p>
+    Thus <em>all symplectic manifolds are locally “canonical”</em>, unlike Riemannian
+    manifolds which have curvature invariants.
+  </p>
+
+  <figure id="fig-2-2" style="text-align:center;">
+    <svg width="420" height="240" style="border:1px solid #ccc;">
+      <text x="20" y="30" font-size="14">General symplectic manifold (M,ω)</text>
+      <ellipse cx="200" cy="150" rx="150" ry="70"
+               fill="none" stroke="#333"/>
+      <rect x="260" y="40" width="140" height="100"
+            fill="rgba(0,80,200,0.1)" stroke="#00f"/>
+      <text x="270" y="60" font-size="12">(q,p)-chart</text>
+      <line x1="240" y1="120" x2="260" y2="90"
+            stroke="#333" marker-end="url(#arrow2)"/>
+      <defs>
+        <marker id="arrow2" markerWidth="10" markerHeight="10"
+                refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L9,3 z" fill="#000"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>
+      <strong>Figure 2.2</strong> – Darboux theorem: locally, every symplectic manifold
+      looks like standard \((q,p)\)-space.
+    </figcaption>
+  </figure>
+
+  <p>
+    Darboux's theorem is crucial because it implies that <strong>symplecticity is a
+    coordinate-free property</strong>.
+    Numerical symplectic integrators should therefore preserve the symplectic form
+    in any coordinate chart.
+  </p>
+
+  <hr/>
+
+  <!-- 2.1.4 -->
+  <h3 id="sec-2-1-4">2.1.4 Symplectic Maps and Canonical Transformations</h3>
+
+  <p><strong>Definition 2.2 (Symplectic diffeomorphism).</strong>
+    A diffeomorphism \( \Psi : M \to M \) is <em>symplectic</em> if
+  </p>
+
+  <p class="math">\[
+      \Psi^* \omega = \omega,
+    \]</p>
+
+  <p>
+    or equivalently, for all \(x\in M\),
+  </p>
+
+  <p class="math">\[
+      D\Psi(x)^\top\, \omega_{\Psi(x)}\, D\Psi(x) = \omega_x.
+    \]</p>
+
+  <p>
+    A symplectic diffeomorphism is traditionally called a
+    <strong>canonical transformation</strong> in classical mechanics.
+  </p>
+
+  <h4>Hamiltonian flows are symplectic</h4>
+
+  <p><strong>Proposition 2.1.</strong>
+    Let \(X_H\) be the Hamiltonian vector field defined by
+    \(i_{X_H}\omega = dH\).  
+    Then its flow \( \varphi_H^t \) satisfies
+  </p>
+
+  <p class="math">\[
+      (\varphi_H^t)^*\omega = \omega.
+    \]</p>
+
+  <p>
+    <em>Proof sketch.</em>
+    Consider the Lie derivative:
+  </p>
+
+  <p class="math">\[
+      \frac{d}{dt} (\varphi_H^t)^*\omega
+      = (\varphi_H^t)^*(\mathcal{L}_{X_H}\omega)
+      = (\varphi_H^t)^*(d(i_{X_H}\omega) + i_{X_H}d\omega)
+      = (\varphi_H^t)^*(ddH + i_{X_H} 0)
+      = 0.
+    \]</p>
+
+  <p>
+    Thus, \((\varphi_H^t)^*\omega\) is constant in \(t\), equal to \(\omega\) at \(t=0\).
+  </p>
+
+  <p>
+    This property is the backbone of the long-time qualitative accuracy of symplectic
+    integrators.
+  </p>
+
+  <hr/>
+
+  <!-- 2.1.5 -->
+  <h3 id="sec-2-1-5">2.1.5 Symplectic Area Preservation: A Visual Demonstration</h3>
+
+  <p>
+    The distinguishing feature of symplectic maps is that they preserve oriented
+    2-dimensional areas defined by the symplectic form, not necessarily Euclidean
+    areas.
+  </p>
+
+  <p>
+    The interactive figure below demonstrates how a linear map behaves when it is:
+  </p>
+  <ul>
+    <li>symplectic (area preserved),</li>
+    <li>not symplectic (area distorted).</li>
+  </ul>
+
+  <figure id="fig-2-3" style="text-align:center;">
+    <canvas id="sympCanvas" width="620" height="300"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 2.3</strong> – Symplectic vs non-symplectic linear transformations.
+      We compare the transformed unit square under a symplectic matrix
+      \(A\) (e.g. rotation in the \((q,p)\)-plane) and under a non-symplectic matrix
+      (shear or scaling). Symplectic area (ω-area) is preserved, Euclidean area need not be.
+    </figcaption>
+  </figure>
+
+  <script>
+    (function(){
+      const canvas = document.getElementById("sympCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+
+      const w = canvas.width, h = canvas.height;
+
+      // Coordinate maps
+      const xmin=-2, xmax=2, ymin=-2, ymax=2;
+      const X = x => (x-xmin)/(xmax-xmin)*w;
+      const Y = y => h - (y-ymin)/(ymax-ymin)*h;
+
+      // Base shape (unit square)
+      const square = [
+        {x:0, y:0}, {x:1, y:0}, {x:1, y:1}, {x:0, y:1}
+      ];
+
+      // Symplectic example: rotation
+      const theta = Math.PI/6;
+      const A_symp = [
+        [ Math.cos(theta), Math.sin(theta)],
+        [-Math.sin(theta), Math.cos(theta)]
+      ];
+
+      // Non-symplectic example: shear
+      const A_nons = [
+        [1.3, 0.6],
+        [0.0, 1.0]
+      ];
+
+      function apply(A, p){
+        return {
+          x: A[0][0]*p.x + A[0][1]*p.y,
+          y: A[1][0]*p.x + A[1][1]*p.y
+        };
+      }
+
+      function drawPolygon(poly,color,label){
+        ctx.beginPath();
+        ctx.moveTo(X(poly[0].x),Y(poly[0].y));
+        for(let k=1;k<poly.length;k++)
+          ctx.lineTo(X(poly[k].x),Y(poly[k].y));
+        ctx.closePath();
+        ctx.strokeStyle=color; 
+        ctx.lineWidth=2; 
+        ctx.stroke();
+        ctx.fillStyle=color;
+        ctx.fillText(label, X(poly[2].x)+5, Y(poly[2].y)-5);
+      }
+
+      ctx.clearRect(0,0,w,h);
+      ctx.font="14px sans-serif";
+
+      // draw axes
+      ctx.strokeStyle="#888";
+      ctx.beginPath();
+      ctx.moveTo(X(xmin),Y(0)); ctx.lineTo(X(xmax),Y(0));
+      ctx.moveTo(X(0),Y(ymin)); ctx.lineTo(X(0),Y(ymax));
+      ctx.stroke();
+
+      // Transform shapes
+      const sq_symp = square.map(pt => apply(A_symp, pt));
+      const sq_nons = square.map(pt => apply(A_nons, pt));
+
+      // Draw
+      drawPolygon(square,"#000","original");
+      drawPolygon(sq_symp,"#06c","symplectic");
+      drawPolygon(sq_nons,"#c00","non-symplectic");
+    })();
+  </script>
+
+  <p>
+    Notice that:
+  </p>
+
+  <ul>
+    <li>
+      The <em>symplectic</em> map preserves the oriented parallelogram area under
+      \(dq\wedge dp\). Indeed for symplectic \(A\),  
+      \( A^\top \Omega A = \Omega \).
+    </li>
+    <li>
+      The non-symplectic map distorts symplectic area, violating the defining identity.
+    </li>
+  </ul>
+
+  <hr/>
+
+  <!-- 2.1.6 -->
+  <h3 id="sec-2-1-6">2.1.6 Summary</h3>
+
+  <p>
+    In this section we introduced:
+  </p>
+
+  <ul>
+    <li>2-forms and alternating bilinear structures,</li>
+    <li>definition of symplectic manifolds,</li>
+    <li>Darboux theorem (local canonical structure),</li>
+    <li>symplectic diffeomorphisms and canonical transformations,</li>
+    <li>Hamiltonian flows as symplectic maps,</li>
+    <li>visual and numerical illustrations of symplectic area preservation.</li>
+  </ul>
+
+  <p>
+    These ideas are the backbone of symplectic integration.  
+    Section 2.2 will introduce <strong>Hamiltonian vector fields</strong>,
+    <strong>Poisson brackets</strong>, and the deep relation between \(\omega\),
+    Hamilton's equations, and structure preservation.
+  </p>
+
+  <hr/>
+
+  <!-- References -->
+  <h3 id="sec-2-1-7">2.1.7 References for Section 2.1</h3>
+
+  <ol>
+    <li><strong>[AM78]</strong> R. Abraham &amp; J.E. Marsden,  
+      <em>Foundations of Mechanics</em>, 2nd ed., Addison–Wesley, 1978.
+    </li>
+    <li><strong>[Arn89]</strong> V.I. Arnold,  
+      <em>Mathematical Methods of Classical Mechanics</em>, 2nd ed.,
+      Springer, 1989.
+    </li>
+    <li><strong>[MS17]</strong> D. McDuff &amp; D. Salamon,  
+      <em>Introduction to Symplectic Topology</em>, 3rd ed.,
+      Oxford University Press, 2017.
+    </li>
+    <li><strong>[HLW06]</strong> E. Hairer, C. Lubich &amp; G. Wanner,
+      <em>Geometric Numerical Integration</em>, 2nd ed., Springer, 2006.
+    </li>
+    <li><strong>[BC26]</strong> S. Blanes &amp; F. Casas,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>,
+      2nd ed., CRC Press, 2026.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-2-2">
+  <h2>2.2 Hamiltonian Vector Fields and Poisson Brackets</h2>
+
+  <p>
+    Hamiltonian mechanics is naturally expressed on a symplectic manifold
+    \((M,\omega)\) by associating to each <em>Hamiltonian function</em> 
+    \(H : M \to \mathbb{R}\) a unique vector field \(X_H\) via the
+    symplectic form. In canonical coordinates, this yields Hamilton’s equations.
+    In this section we:
+  </p>
+
+  <ol>
+    <li>Define Hamiltonian vector fields on a symplectic manifold,</li>
+    <li>Derive Hamilton’s equations in \((q,p)\)-coordinates,</li>
+    <li>Introduce the Poisson bracket and its properties,</li>
+    <li>Work through simple examples,</li>
+    <li>Visualise Hamiltonian flows as tangent to level sets of \(H\).</li>
+  </ol>
+
+  <hr/>
+
+  <!-- 2.2.1 -->
+  <h3 id="sec-2-2-1">2.2.1 Hamiltonian Vector Fields on a Symplectic Manifold</h3>
+
+  <p>
+    Let \((M,\omega)\) be a symplectic manifold as defined in §2.1. For each smooth
+    Hamiltonian \(H : M \to \mathbb{R}\), we define the associated
+    <strong>Hamiltonian vector field</strong> \(X_H\) by:
+  </p>
+
+  <p class="math">
+    \[
+      i_{X_H}\,\omega = dH,
+    \]
+  </p>
+
+  <p>
+    where \(i_{X_H}\) denotes interior contraction with the vector field \(X_H\).
+    At each point \(x\in M\),
+  </p>
+
+  <p class="math">
+    \[
+      \omega_x(X_H(x), \cdot) = dH_x(\cdot).
+    \]
+  </p>
+
+  <p>
+    Because \(\omega_x\) is non-degenerate, this relation uniquely determines
+    \(X_H(x)\) for each \(x\), giving a globally defined vector field \(X_H\).
+  </p>
+
+  <h4>Interpretation</h4>
+
+  <p>
+    The map
+  </p>
+
+  <p class="math">
+    \[
+      \flat_\omega : T_xM \to T_x^*M, 
+      \qquad v \mapsto \omega_x(v,\cdot)
+    \]
+  </p>
+
+  <p>
+    is an isomorphism (“musical isomorphism”). Then
+  </p>
+
+  <p class="math">
+    \[
+      X_H(x) = \big(\flat_\omega^{-1}\big)(dH_x),
+    \]
+  </p>
+
+  <p>
+    i.e. \(X_H\) is the vector field obtained by “raising the index” of the
+    differential \(dH\) using the symplectic form. The resulting flow
+    \(\varphi_H^t\) is the Hamiltonian evolution of the system with Hamiltonian \(H\).
+  </p>
+
+  <hr/>
+
+  <!-- 2.2.2 -->
+  <h3 id="sec-2-2-2">2.2.2 Hamilton’s Equations in Canonical Coordinates</h3>
+
+  <p>
+    On the standard symplectic vector space \(M = \mathbb{R}^{2m}\) with coordinates
+    \(z = (q,p) = (q_1,\dots,q_m,p_1,\dots,p_m)\) and symplectic form
+  </p>
+
+  <p class="math">
+    \[
+      \omega_0 = \sum_{i=1}^m dq_i \wedge dp_i,
+    \]
+  </p>
+
+  <p>
+    the Hamiltonian vector field has the familiar coordinate expression
+    given by <strong>Hamilton’s equations</strong>.
+  </p>
+
+  <p>
+    Writing \(X_H(z) = (\dot{q},\dot{p})\), the condition
+    \(i_{X_H}\omega_0 = dH\) yields
+  </p>
+
+  <p class="math">
+    \[
+      \dot{q}_i = \frac{\partial H}{\partial p_i},
+      \qquad
+      \dot{p}_i = -\frac{\partial H}{\partial q_i},
+      \qquad i=1,\dots,m.
+    \]
+  </p>
+
+  <p>
+    In matrix notation, with
+  </p>
+
+  <p class="math">
+    \[
+      \Omega = \begin{pmatrix}
+        0 & I_m\\
+        -I_m & 0
+      \end{pmatrix},
+      \qquad
+      z = \begin{pmatrix}q\\p\end{pmatrix},
+    \]
+  </p>
+
+  <p>
+    we can write the Hamiltonian system as
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z} = X_H(z) = \Omega \nabla H(z).
+    \]
+  </p>
+
+  <p>
+    The flow \(\varphi_H^t\) generated by this ODE is symplectic, as shown
+    in §2.1.4.
+  </p>
+
+  <hr/>
+
+  <!-- 2.2.3 -->
+  <h3 id="sec-2-2-3">2.2.3 Energy Conservation and Tangency to Level Sets</h3>
+
+  <p>
+    A fundamental property of Hamiltonian flows is that the Hamiltonian itself
+    is a first integral of its own flow.
+  </p>
+
+  <p><strong>Proposition 2.2 (Conservation of energy).</strong>
+    Let \(H : M \to \mathbb{R}\) be a Hamiltonian and \(X_H\) the associated
+    Hamiltonian vector field. Then, along the flow \(\varphi_H^t\),
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt} H(\varphi_H^t(x)) = 0.
+    \]
+  </p>
+
+  <p><em>Proof.</em>
+    We have
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt} H(\varphi_H^t(x))
+      = dH_{\varphi_H^t(x)}\!\big(\dot{\varphi}_H^t(x)\big)
+      = dH_{\varphi_H^t(x)}\!\big(X_H(\varphi_H^t(x))\big).
+    \]
+  </p>
+
+  <p>
+    Using the defining relation \(i_{X_H}\omega = dH\), we get
+  </p>
+
+  <p class="math">
+    \[
+      dH(X_H) = \omega(X_H, X_H) = 0
+    \]
+  </p>
+
+  <p>
+    because \(\omega\) is skew-symmetric. Hence the derivative vanishes identically.
+    \(\square\)
+  </p>
+
+  <p>
+    Thus Hamiltonian trajectories lie on level sets of \(H\). In canonical
+    coordinates this means:
+  </p>
+
+  <p class="math">
+    \[
+      \nabla H(z) \cdot X_H(z) = 0,
+    \]
+  </p>
+
+  <p>
+    i.e. the vector field is everywhere tangent to the level surfaces of \(H\).
+  </p>
+
+  <figure id="fig-2-4" style="text-align:center;">
+    <canvas id="hamFlowCanvas" width="620" height="300"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 2.4</strong> – Level sets of a Hamiltonian
+      \(H(q,p) = \tfrac{1}{2}(p^2 + q^2)\) (circles) with Hamiltonian vector field
+      \(X_H = (p, -q)\) shown as arrows. Arrows are tangent to the level sets,
+      illustrating energy conservation.
+    </figcaption>
+  </figure>
+
+  <script>
+    (function(){
+      const canvas = document.getElementById("hamFlowCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+
+      const w = canvas.width, h = canvas.height;
+      const xmin=-2, xmax=2, ymin=-2, ymax=2;
+      const X = x => (x-xmin)/(xmax-xmin)*w;
+      const Y = y => h - (y-ymin)/(ymax-ymin)*h;
+
+      ctx.clearRect(0,0,w,h);
+      ctx.font = "12px sans-serif";
+
+      // Draw axes
+      ctx.strokeStyle="#999";
+      ctx.beginPath();
+      ctx.moveTo(X(xmin), Y(0)); ctx.lineTo(X(xmax), Y(0));
+      ctx.moveTo(X(0), Y(ymin)); ctx.lineTo(X(0), Y(ymax));
+      ctx.stroke();
+
+      // Draw some level sets of H = (p^2 + q^2)/2: circles
+      ctx.strokeStyle="#ccc";
+      const radii = [0.5,1,1.5];
+      radii.forEach(r => {
+        ctx.beginPath();
+        ctx.arc(X(0), Y(0),
+                r/(xmax-xmin)*w*0.5*2, // approximate scaling
+                0, 2*Math.PI);
+        ctx.stroke();
+      });
+
+      // Vector field X_H = (p, -q)
+      ctx.strokeStyle="#006";
+      const N = 13;
+      for(let i=0;i<N;i++){
+        for(let j=0;j<N;j++){
+          const q = xmin + (xmax-xmin)*i/(N-1);
+          const p = ymin + (ymax-ymin)*j/(N-1);
+          const dx = p, dy = -q;
+          const norm = Math.sqrt(dx*dx+dy*dy) || 1e-6;
+          const scale = 0.25;
+          const uq = dx/norm*scale;
+          const up = dy/norm*scale;
+          const x1 = X(q-0.5*uq);
+          const y1 = Y(p-0.5*up);
+          const x2 = X(q+0.5*uq);
+          const y2 = Y(p+0.5*up);
+          ctx.beginPath();
+          ctx.moveTo(x1,y1);
+          ctx.lineTo(x2,y2);
+          ctx.stroke();
+        }
+      }
+    })();
+  </script>
+
+  <hr/>
+
+  <!-- 2.2.4 -->
+  <h3 id="sec-2-2-4">2.2.4 The Poisson Bracket</h3>
+
+  <p>
+    On a symplectic manifold \((M,\omega)\), the assignment \(H \mapsto X_H\)
+    can be used to define a Lie algebra structure on smooth functions via the
+    <strong>Poisson bracket</strong>.
+  </p>
+
+  <p><strong>Definition 2.3 (Poisson bracket).</strong>
+    For \(F,G \in C^\infty(M)\), their Poisson bracket is
+  </p>
+
+  <p class="math">
+    \[
+      \{F,G\} := \omega(X_F,X_G)
+      = dF(X_G) = -\,dG(X_F).
+    \]
+  </p>
+
+  <p>
+    In canonical coordinates on \(\mathbb{R}^{2m}\), this reduces to the familiar
+    formula
+  </p>
+
+  <p class="math">
+    \[
+      \{F,G\}
+      = \sum_{i=1}^m
+        \left(
+          \frac{\partial F}{\partial q_i}
+          \frac{\partial G}{\partial p_i}
+          - 
+          \frac{\partial F}{\partial p_i}
+          \frac{\partial G}{\partial q_i}
+        \right).
+    \]
+  </p>
+
+  <h4>Basic properties</h4>
+
+  <p>
+    The Poisson bracket has the following properties:
+  </p>
+
+  <ol>
+    <li><strong>Bilinearity:</strong> \(\{aF + bG, H\} = a\{F,H\} + b\{G,H\}\).</li>
+    <li><strong>Skew-symmetry:</strong> \(\{F,G\} = -\{G,F\}\).</li>
+    <li><strong>Leibniz rule:</strong> \(\{F,GH\} = \{F,G\}H + G\{F,H\}\).</li>
+    <li><strong>Jacobi identity:</strong> \(\{F,\{G,H\}\} + \{G,\{H,F\}\} + \{H,\{F,G\}\}=0.\)</li>
+  </ol>
+
+  <p>
+    In particular, the Jacobi identity means that \((C^\infty(M),\{\cdot,\cdot\})\)
+    is a Lie algebra. The map
+  </p>
+
+  <p class="math">
+    \[
+      C^\infty(M) \to \mathfrak{X}(M), \qquad 
+      H \mapsto X_H
+    \]
+  </p>
+
+  <p>
+    is a Lie algebra homomorphism up to sign:
+  </p>
+
+  <p class="math">
+    \[
+      [X_F,X_G] = X_{\{F,G\}}.
+    \]
+  </p>
+
+  <p>
+    This identity is pivotal in the analysis of splitting and composition methods,
+    where commutators of vector fields appear in the BCH expansion (see §1.3.4).
+  </p>
+
+  <hr/>
+
+  <!-- 2.2.5 -->
+  <h3 id="sec-2-2-5">2.2.5 Constants of Motion and Poisson Commutation</h3>
+
+  <p>
+    Let \(H\) be the Hamiltonian of the system. A function \(I : M\to\mathbb{R}\)
+    is a <em>constant of motion</em> (first integral) if
+  </p>
+
+  <p class="math">
+    \[
+      \{I,H\} = 0.
+    \]
+  </p>
+
+  <p>
+    To see this, note that the time derivative of \(I\) along the Hamiltonian flow is
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt} I(\varphi_H^t(x))
+      = \{I,H\}(\varphi_H^t(x)).
+    \]
+  </p>
+
+  <p>
+    Thus \(\frac{d}{dt} I(\varphi_H^t(x)) = 0\) iff \(\{I,H\} = 0\) along the trajectory.
+  </p>
+
+  <p>
+    When we design geometric integrators, we are often interested in methods that
+    preserve certain Poisson commuting quantities, at least approximately.
+  </p>
+
+  <hr/>
+
+  <!-- 2.2.6 -->
+  <h3 id="sec-2-2-6">2.2.6 Examples</h3>
+
+  <h4>(a) Harmonic oscillator in ℝ²</h4>
+
+  <p>
+    For the harmonic oscillator with Hamiltonian
+  </p>
+
+  <p class="math">
+    \[
+      H(q,p) = \tfrac{1}{2}(p^2 + q^2),
+    \]
+  </p>
+
+  <p>
+    we have
+  </p>
+
+  <p class="math">
+    \[
+      \frac{\partial H}{\partial p} = p, \qquad
+      \frac{\partial H}{\partial q} = q,
+    \]
+  </p>
+
+  <p>
+    thus
+  </p>
+
+  <p class="math">
+    \[
+      \dot{q} = p, \qquad \dot{p} = -q.
+    \]
+  </p>
+
+  <p>
+    The flow is a rotation in phase space; energy level sets are concentric circles.
+  </p>
+
+  <h4>(b) Central force in ℝ³</h4>
+
+  <p>
+    Consider a particle in \(\mathbb{R}^3\) with position \(x\) and momentum \(p\),
+    Hamiltonian
+  </p>
+
+  <p class="math">
+    \[
+      H(x,p) = \frac{1}{2m} |p|^2 + V(|x|),
+    \]
+  </p>
+
+  <p>
+    where \(V\) is a radial potential. The angular momentum
+  </p>
+
+  <p class="math">
+    \[
+      L = x \times p
+    \]
+  </p>
+
+  <p>
+    is a constant of motion, which can be verified by checking \(\{L_i,H\}=0\),
+    or geometrically via rotational symmetry and Noether’s theorem. This is a
+    basic example where geometric structure (rotational invariance) leads to
+    conserved quantities.
+  </p>
+
+  <figure id="tab-2-2">
+    <table border="1" cellpadding="4" cellspacing="0"
+           style="border-collapse:collapse; width:100%;">
+      <thead>
+        <tr>
+          <th>Hamiltonian \(H\)</th>
+          <th>Phase space</th>
+          <th>Hamiltonian vector field \(X_H\)</th>
+          <th>Conserved quantity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>\(\tfrac{1}{2}(p^2 + q^2)\)</td>
+          <td>\(\mathbb{R}^2\)</td>
+          <td>\((p,-q)\)</td>
+          <td>Energy \(H\)</td>
+        </tr>
+        <tr>
+          <td>\(\tfrac{1}{2m}|p|^2 + V(|x|)\)</td>
+          <td>\(\mathbb{R}^3\times\mathbb{R}^3\)</td>
+          <td>\((p/m,\,-\nabla V)\)</td>
+          <td>Energy \(H\), angular momentum \(L\)</td>
+        </tr>
+      </tbody>
+    </table>
+    <figcaption>
+      <strong>Table 2.2</strong> – Examples of Hamiltonian vector fields and constants of motion.
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 2.2.7 -->
+  <h3 id="sec-2-2-7">2.2.7 Interactive Poisson Bracket Explorer (2D)</h3>
+
+  <p>
+    The small interactive demo below evaluates the Poisson bracket
+    \(\{F,G\}\) at a grid of points for some simple choices of
+    functions \(F,G\) in the plane. It highlights (in colour) where
+    the bracket vanishes.
+  </p>
+
+  <figure id="fig-2-5" style="text-align:center;">
+    <canvas id="pbCanvas" width="620" height="300"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 2.5</strong> – Approximate sign of \(\{F,G\}\) on a grid
+      in \((q,p)\)-space for selected functions \(F,G\). Blue points ≈ negative,
+      red points ≈ positive, gray ≈ near zero.
+    </figcaption>
+  </figure>
+
+  <script>
+    (function(){
+      const canvas = document.getElementById("pbCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+
+      const w = canvas.width, h = canvas.height;
+      const xmin=-2, xmax=2, ymin=-2, ymax=2;
+      const X = x => (x-xmin)/(xmax-xmin)*w;
+      const Y = y => h - (y-ymin)/(ymax-ymin)*h;
+
+      // Example: choose F(q,p) = H(q,p) = (p^2+q^2)/2, G(q,p) = q
+      function F(q,p){ return 0.5*(p*p+q*q); }
+      function G(q,p){ return q; }
+
+      function dF_dq(q,p){ return q; }
+      function dF_dp(q,p){ return p; }
+      function dG_dq(q,p){ return 1; }
+      function dG_dp(q,p){ return 0; }
+
+      function poisson(q,p){
+        return dF_dq(q,p)*dG_dp(q,p) - dF_dp(q,p)*dG_dq(q,p);
+      }
+
+      ctx.clearRect(0,0,w,h);
+      ctx.font="12px sans-serif";
+
+      // axes
+      ctx.strokeStyle="#999";
+      ctx.beginPath();
+      ctx.moveTo(X(xmin),Y(0)); ctx.lineTo(X(xmax),Y(0));
+      ctx.moveTo(X(0),Y(ymin)); ctx.lineTo(X(0),Y(ymax));
+      ctx.stroke();
+
+      const N = 40;
+      for(let i=0;i<N;i++){
+        for(let j=0;j<N;j++){
+          const q = xmin + (xmax-xmin)*(i+0.5)/N;
+          const p = ymin + (ymax-ymin)*(j+0.5)/N;
+          const val = poisson(q,p);
+          let color;
+          const eps = 0.2;
+          if (Math.abs(val) < eps) color = "#aaa";
+          else if (val > 0) color = "#c00";
+          else color = "#06c";
+          ctx.fillStyle = color;
+          ctx.fillRect(X(q)-2, Y(p)-2, 4, 4);
+        }
+      }
+
+      ctx.fillStyle="#000";
+      ctx.fillText("Example: F = H = (p^2+q^2)/2, G = q ⇒ {F,G} = -p", 10, 20);
+      ctx.fillText("Gray: |{F,G}| ≈ small, blue/red: negative/positive", 10, 36);
+    })();
+  </script>
+
+  <p>
+    In this example, \(\{H,q\} = -p\), so the bracket vanishes along the
+    horizontal axis \(p=0\) and changes sign across it. This simple picture
+    connects the algebraic definition with a geometric field on phase space.
+  </p>
+
+  <hr/>
+
+  <!-- 2.2.8 -->
+  <h3 id="sec-2-2-8">2.2.8 Summary and Outlook</h3>
+
+  <p>
+    We have:
+  </p>
+
+  <ul>
+    <li>Defined Hamiltonian vector fields via the symplectic form,</li>
+    <li>Derived Hamilton’s equations in canonical coordinates,</li>
+    <li>Shown that Hamiltonian flows conserve energy and are tangent to level sets of \(H\),</li>
+    <li>Introduced the Poisson bracket and its key Lie-algebraic properties,</li>
+    <li>Connected Poisson commuting functions to constants of motion.</li>
+  </ul>
+
+  <p>
+    In the next section (2.3), we develop the role of symmetry in Hamiltonian
+    systems, introduce <strong>momentum maps</strong>, and state a version of
+    <strong>Noether’s theorem</strong> in the symplectic setting, preparing
+    the ground for symmetry-preserving geometric integrators.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-2-2-9">2.2.9 References for Section 2.2</h3>
+
+  <ol>
+    <li><strong>V.I. Arnold</strong>,
+      <em>Mathematical Methods of Classical Mechanics</em>, 2nd ed., Springer, 1989.
+    </li>
+    <li><strong>R. Abraham &amp; J.E. Marsden</strong>,
+      <em>Foundations of Mechanics</em>, 2nd ed., Addison–Wesley, 1978.
+    </li>
+    <li><strong>D. McDuff &amp; D. Salamon</strong>,
+      <em>Introduction to Symplectic Topology</em>, 3rd ed., Oxford Univ. Press, 2017.
+    </li>
+    <li><strong>E. Hairer, C. Lubich &amp; G. Wanner</strong>,
+      <em>Geometric Numerical Integration</em>, 2nd ed., Springer, 2006.
+    </li>
+    <li><strong>S. Blanes &amp; F. Casas</strong>,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>,
+      2nd ed., CRC Press, 2026.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-2-3">
+  <h2>2.3 Symmetries, Momentum Maps, and Noether’s Theorem</h2>
+
+  <p>
+    The structure of Hamiltonian systems is deeply connected with symmetry.
+    Continuous symmetries give rise to conserved quantities, and these conserved
+    quantities in turn constrain the geometry of the system’s flow.
+    This section formalises:
+  </p>
+
+  <ol>
+    <li>Symplectic group actions and infinitesimal generators,</li>
+    <li>Momentum maps and their characterisation,</li>
+    <li>Noether’s theorem in the symplectic setting,</li>
+    <li>Examples: rotations, translations, angular momentum, linear momentum,</li>
+    <li>Visualisation of symmetric Hamiltonian flows.</li>
+  </ol>
+
+  <hr/>
+
+  <!-- 2.3.1 -->
+  <h3 id="sec-2-3-1">2.3.1 Symmetries as Group Actions on Symplectic Manifolds</h3>
+
+  <p>
+    Let \(G\) be a Lie group with Lie algebra \(\mathfrak{g}\).
+    A smooth (left) group action on a symplectic manifold \((M,\omega)\) is a map
+  </p>
+
+  <p class="math">
+    \[
+      \Phi: G \times M \to M,
+      \qquad
+      \Phi(g,x) = g\cdot x,
+    \]
+  </p>
+
+  <p>
+    satisfying:
+  </p>
+
+  <ul>
+    <li>\(e\cdot x = x\) for identity \(e\in G\),</li>
+    <li>\(g_1\cdot (g_2\cdot x) = (g_1g_2)\cdot x\).</li>
+  </ul>
+
+  <p>
+    The action is called <em>symplectic</em> if each map
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_g : M \to M, \qquad x\mapsto g\cdot x,
+    \]
+  </p>
+
+  <p>
+    is a symplectic diffeomorphism:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_g^* \omega = \omega.
+    \]
+  </p>
+
+  <hr/>
+
+  <!-- 2.3.2 -->
+  <h3 id="sec-2-3-2">2.3.2 Infinitesimal Generators of Group Actions</h3>
+
+  <p>
+    For each \(\xi \in \mathfrak{g}\) we define the <strong>infinitesimal generator</strong>
+    of the action:
+  </p>
+
+  <p class="math">
+    \[
+      \xi_M(x) := \left.\frac{d}{dt}\right|_{t=0} \exp(t\xi)\cdot x \in T_xM.
+    \]
+  </p>
+
+  <p>
+    Because the action is symplectic, each \(\xi_M\) satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{L}_{\xi_M}\omega = 0.
+    \]
+  </p>
+
+  <p>
+    The vector field \(\xi_M\) is symplectic but not necessarily Hamiltonian.
+    If there exists a smooth function \(J_\xi\) such that
+  </p>
+
+  <p class="math">
+    \[
+      i_{\xi_M}\omega = dJ_\xi,
+    \]
+  </p>
+
+  <p>
+    then the symmetry is called <strong>Hamiltonian</strong>.
+  </p>
+
+  <hr/>
+
+  <!-- 2.3.3 -->
+  <h3 id="sec-2-3-3">2.3.3 Momentum Maps</h3>
+
+  <p>
+    For a Hamiltonian group action, the map
+  </p>
+
+  <p class="math">
+    \[
+      J : M \to \mathfrak{g}^*,
+    \]
+  </p>
+
+  <p>
+    is called the <strong>momentum map</strong> if
+  </p>
+
+  <p class="math">
+    \[
+      \langle J(x), \xi\rangle = J_\xi(x),
+      \qquad
+      dJ_\xi = i_{\xi_M}\omega,
+    \]
+  </p>
+
+  <p>
+    for all \(\xi\in\mathfrak{g}\).
+  </p>
+
+  <p>
+    The momentum map collects all conserved quantities associated with the symmetry.
+  </p>
+
+  <h4>Equivariance</h4>
+
+  <p>
+    A momentum map is called <strong>equivariant</strong> if:
+  </p>
+
+  <p class="math">
+    \[
+      J(g\cdot x) = \mathrm{Ad}^*_{g} \, J(x),
+    \]
+  </p>
+
+  <p>
+    where \(\mathrm{Ad}^*\) is the coadjoint action.  
+    Equivariance leads to powerful structural results but is not strictly required
+    for basic conservation laws.
+  </p>
+
+  <hr/>
+
+  <!-- 2.3.4 -->
+  <h3 id="sec-2-3-4">2.3.4 Noether’s Theorem in the Symplectic Setting</h3>
+
+  <p><strong>Theorem 2.3 (Noether).</strong>
+    Let \(G\) act on a symplectic manifold \((M,\omega)\) by symplectic
+    diffeomorphisms. Suppose the Hamiltonian \(H : M\to\mathbb{R}\) is
+    invariant under the action:
+  </p>
+
+  <p class="math">
+    \[
+      H(g\cdot x) = H(x),\qquad \forall g\in G.
+    \]
+  </p>
+
+  <p>
+    Then for each \(\xi\in\mathfrak{g}\), the corresponding momentum map
+    component \(J_\xi = \langle J,\xi\rangle\) satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      \{J_\xi, H\} = 0.
+    \]
+  </p>
+
+  <p>
+    That is, <em>symmetry implies a conserved quantity</em>.
+  </p>
+
+  <h4>Proof sketch</h4>
+
+  <p>
+    If \(H\) is invariant under the flow of \(\xi_M\), then:
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{L}_{\xi_M} H = 0.
+    \]
+  </p>
+
+  <p>
+    But
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{L}_{\xi_M} H
+      = dH(\xi_M)
+      = \omega(X_H,\xi_M)
+      = \{J_\xi, H\}.
+    \]
+  </p>
+
+  <p>
+    Hence the Poisson bracket vanishes, giving conservation of \(J_\xi\).
+  </p>
+
+  <hr/>
+
+  <!-- 2.3.5 -->
+  <h3 id="sec-2-3-5">2.3.5 Examples of Momentum Maps</h3>
+
+  <h4>(a) Spatial translations</h4>
+
+  <p>
+    On \(M=\mathbb{R}^{2m}\) with coordinates \((q,p)\), the group \(G=\mathbb{R}^m\)
+    acts by translations:
+  </p>
+
+  <p class="math">
+    \[
+      v \cdot (q,p) = (q+v,p).
+    \]
+  </p>
+
+  <p>
+    The infinitesimal generator corresponding to direction \(e_i\in\mathbb{R}^m\) is
+    simply
+  </p>
+
+  <p class="math">
+    \[
+      (e_i)_M = \frac{\partial}{\partial q_i}.
+    \]
+  </p>
+
+  <p>
+    Solving \(i_{(e_i)_M}\omega = dJ_{e_i}\) gives
+  </p>
+
+  <p class="math">
+    \[
+      J_{e_i} = p_i.
+    \]
+  </p>
+
+  <p>
+    Thus the momentum map is \(J(q,p) = p\), i.e. linear momentum.
+  </p>
+
+  <h4>(b) Rotations in \(\mathbb{R}^3\)</h4>
+
+  <p>
+    For \(G = SO(3)\) acting on phase space
+    \(M = T^*\mathbb{R}^3 \cong \mathbb{R}^3 \times \mathbb{R}^3\) by rotations:
+  </p>
+
+  <p class="math">
+    \[
+      R\cdot(x,p) = (Rx, Rp),
+    \]
+  </p>
+
+  <p>
+    the Lie algebra \(\mathfrak{so}(3)\) identifies with \(\mathbb{R}^3\),
+    with infinitesimal action:
+  </p>
+
+  <p class="math">
+    \[
+      \xi_M = (\xi \times x,\, \xi \times p).
+    \]
+  </p>
+
+  <p>
+    Then the momentum map is
+  </p>
+
+  <p class="math">
+    \[
+      J(x,p) = x\times p = L,
+    \]
+  </p>
+
+  <p>
+    i.e. the angular momentum vector.
+  </p>
+
+  <figure id="fig-2-6" style="text-align:center;">
+    <svg width="500" height="260" style="border:1px solid #ccc;">
+      <text x="10" y="20" font-size="14">Angular momentum: J(x,p)=x×p</text>
+      <!-- Cross product diagram -->
+      <line x1="180" y1="140" x2="260" y2="90"
+            stroke="#06c" stroke-width="2" marker-end="url(#ar1)" />
+      <text x="265" y="85" font-size="12">x</text>
+
+      <line x1="180" y1="140" x2="120" y2="60"
+            stroke="#900" stroke-width="2" marker-end="url(#ar2)" />
+      <text x="110" y="55" font-size="12">p</text>
+
+      <!-- Resultant -->
+      <line x1="180" y1="140" x2="300" y2="200"
+            stroke="#060" stroke-width="3" marker-end="url(#ar3)" />
+      <text x="310" y="205" font-size="12">x×p</text>
+
+      <defs>
+        <marker id="ar1" markerWidth="12" markerHeight="12"
+                refX="5" refY="6" orient="auto">
+          <path d="M0,0 L0,12 L12,6 z" fill="#06c"/>
+        </marker>
+        <marker id="ar2" markerWidth="12" markerHeight="12"
+                refX="5" refY="6" orient="auto">
+          <path d="M0,0 L0,12 L12,6 z" fill="#900"/>
+        </marker>
+        <marker id="ar3" markerWidth="12" markerHeight="12"
+                refX="5" refY="6" orient="auto">
+          <path d="M0,0 L0,12 L12,6 z" fill="#060"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>
+      <strong>Figure 2.6</strong> – Angular momentum as the momentum map for 
+      rotational symmetry.
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 2.3.6 -->
+  <h3 id="sec-2-3-6">2.3.6 Interactive Example: Rotational Symmetry and Angular Momentum Conservation</h3>
+
+  <p>
+    The JavaScript demo below shows the vector field for the Hamiltonian
+    \[
+      H(x,y,p_x,p_y) = \frac{1}{2}(p_x^2+p_y^2) + V(r), \qquad r=\sqrt{x^2+y^2},
+    \]
+    with \(V(r) = \tfrac{1}{2}r^2\) for simplicity.
+
+    The motion occurs on circles and angular momentum \(L = x p_y - y p_x\) is conserved.
+  </p>
+
+  <figure id="fig-2-7" style="text-align:center;">
+    <canvas id="rotSymCanvas" width="620" height="300"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 2.7</strong> – Hamiltonian flow with rotational symmetry.
+      Streamlines are circular; the angular momentum is conserved.
+    </figcaption>
+  </figure>
+
+  <script>
+    (function(){
+      const canvas = document.getElementById("rotSymCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+
+      const w = canvas.width, h = canvas.height;
+      const xmin=-2, xmax=2, ymin=-2, ymax=2;
+      const X = x => (x-xmin)/(xmax-xmin)*w;
+      const Y = y => h - (y-ymin)/(ymax-ymin)*h;
+
+      ctx.clearRect(0,0,w,h);
+      ctx.font="12px sans-serif";
+
+      // Axes
+      ctx.strokeStyle="#777";
+      ctx.beginPath();
+      ctx.moveTo(X(xmin),Y(0)); ctx.lineTo(X(xmax),Y(0));
+      ctx.moveTo(X(0),Y(ymin)); ctx.lineTo(X(0),Y(ymax));
+      ctx.stroke();
+
+      // Draw vector field: for harmonic oscillator with rotational symmetry
+      const N = 15;
+      for(let i=0;i<N;i++){
+        for(let j=0;j<N;j++){
+          const x = xmin + (xmax-xmin)*i/(N-1);
+          const y = ymin + (ymax-ymin)*j/(N-1);
+          const px = y;    // approximate direction for demonstration
+          const py = -x;
+          const norm = Math.sqrt(px*px+py*py)||1;
+          const scale = 0.2;
+          const ux = px/norm*scale;
+          const uy = py/norm*scale;
+
+          ctx.beginPath();
+          ctx.moveTo(X(x-ux/2),Y(y-uy/2));
+          ctx.lineTo(X(x+ux/2),Y(y+uy/2));
+          ctx.strokeStyle="#06c";
+          ctx.stroke();
+        }
+      }
+
+      ctx.fillStyle="#000";
+      ctx.fillText("Rotationally symmetric vector field (example)",10,20);
+      ctx.fillText("Flowlines are circles: angular momentum conserved",10,35);
+    })();
+  </script>
+
+  <hr/>
+
+  <!-- 2.3.7 -->
+  <h3 id="sec-2-3-7">2.3.7 Summary</h3>
+
+  <p>
+    In this section, we introduced:
+  </p>
+
+  <ul>
+    <li>Symplectic group actions and infinitesimal generators,</li>
+    <li>Momentum maps collecting the conserved quantities,</li>
+    <li>The symplectic formulation of Noether’s theorem,</li>
+    <li>Translations ↔ linear momentum; rotations ↔ angular momentum,</li>
+    <li>Visualisations of symmetric Hamiltonian flows.</li>
+  </ul>
+
+  <p>
+    This prepares the ground for Chapters 3–4:  
+    <strong>Symplectic integrators</strong> (leapfrog, splitting, variational)  
+    must preserve symplectic form, and **symmetry-preserving methods** preserve  
+    momentum maps. Both ideas are essential in long-time stability analysis.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-2-3-8">2.3.8 References for Section 2.3</h3>
+
+  <ol>
+    <li><strong>[Arn89]</strong> V. Arnol'd,
+      <em>Mathematical Methods of Classical Mechanics</em>,
+      Springer, 1989.
+    </li>
+    <li><strong>[AM78]</strong> R. Abraham &amp; J.E. Marsden,
+      <em>Foundations of Mechanics</em>, 2nd ed.,
+      Addison–Wesley, 1978.
+    </li>
+    <li><strong>[MS17]</strong> D. McDuff &amp; D. Salamon,
+      <em>Introduction to Symplectic Topology</em>,
+      Oxford University Press, 2017.
+    </li>
+    <li><strong>[HLW06]</strong> E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration</em>, 2nd ed.,
+      Springer, 2006.
+    </li>
+    <li><strong>[BC26]</strong> S. Blanes &amp; F. Casas,
+      <em>Concise Introduction to GNI</em>, 2nd ed.,
+      CRC Press, 2026.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-2-4">
+  <h2>2.4 Poisson Manifolds and Poisson Brackets</h2>
+
+  <p>
+    Symplectic manifolds model unconstrained Hamiltonian mechanics.  
+    But many important systems are <em>constrained</em>, <em>reduced by symmetry</em>, or 
+    live on spaces whose geometry is not symplectic — e.g. a rigid body’s angular 
+    momentum space <span class="math">\(\mathfrak{so}(3)^*\)</span>, plasma models, Euler equations, 
+    Lie–Poisson systems, and systems obtained after symmetry reduction.
+  </p>
+
+  <p>
+    Poisson manifolds provide the natural geometric framework for all of these.
+    The theory is a strict generalisation of symplectic geometry:
+  </p>
+
+  <ul>
+    <li>Every symplectic manifold is Poisson.</li>
+    <li>Not every Poisson manifold is symplectic.</li>
+    <li>Poisson manifolds allow degenerate brackets and foliations 
+        into symplectic leaves.</li>
+    <li>Reduction (Marsden–Weinstein), constraints (Dirac), and Lie–Poisson 
+        dynamics all arise within this framework.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 2.4.1 -->
+  <h3 id="sec-2-4-1">2.4.1 Definition of a Poisson Structure</h3>
+
+  <p>
+    A <strong>Poisson bracket</strong> on a smooth manifold \(M\) is a bilinear map
+  </p>
+
+  <p class="math">
+    \[
+      \{\,\cdot\,,\,\cdot\,\}: C^\infty(M)\times C^\infty(M) \to C^\infty(M)
+    \]
+  </p>
+
+  <p>
+    satisfying:
+  </p>
+
+  <ol>
+    <li><strong>Skew-symmetry:</strong>
+      <span class="math">\(\{f,g\} = -\{g,f\}\)</span>.</li>
+    <li><strong>Leibniz rule:</strong>
+      <span class="math">\(\{f,gh\} = \{f,g\}h + g\{f,h\}\)</span>.</li>
+    <li><strong>Jacobi identity:</strong></li>
+    <p class="math">
+      \[
+        \{f,\{g,h\}\} + \{g,\{h,f\}\} + \{h,\{f,g\}\} = 0.
+      \]
+    </p>
+  </ol>
+
+  <p>
+    A manifold equipped with such a bracket is a <strong>Poisson manifold</strong>
+    \((M,\{\cdot,\cdot\})\).
+  </p>
+
+  <hr/>
+
+  <!-- 2.4.2 -->
+  <h3 id="sec-2-4-2">2.4.2 The Poisson Tensor</h3>
+
+  <p>
+    A Poisson bracket is encoded by a bivector field
+    <span class="math">\(\pi \in \Gamma(\Lambda^2 TM)\)</span> such that:
+  </p>
+
+  <p class="math">
+    \[
+      \{f,g\} = \pi(df,dg).
+    \]
+  </p>
+
+  <p>
+    The Jacobi identity is equivalent to:
+  </p>
+
+  <p class="math">
+    \[
+      [\pi,\pi]_{\mathrm{SN}} = 0,
+    \]
+  </p>
+
+  <p>
+    where <span class="math">\([\cdot,\cdot]_{\mathrm{SN}}\)</span> is the 
+    <strong>Schouten–Nijenhuis bracket</strong>.
+  </p>
+
+  <h4>Example: canonical Poisson tensor</h4>
+
+  <p>
+    In canonical coordinates <span class="math">\((q,p) \in \mathbb{R}^{2m}\)</span>,
+  </p>
+
+  <p class="math">
+    \[
+      \pi =
+      \begin{pmatrix}
+      0 & I_m \\
+      -I_m & 0
+      \end{pmatrix}.
+    \]
+  </p>
+
+  <p>
+    This reproduces the standard symplectic bracket.  
+    In a general Poisson manifold, the rank of 
+    <span class="math">\(\pi(x)\)</span> may vary with \(x\).
+  </p>
+
+  <hr/>
+
+  <!-- 2.4.3 -->
+  <h3 id="sec-2-4-3">2.4.3 Hamiltonian Vector Fields on a Poisson Manifold</h3>
+
+  <p>
+    Given \(H\in C^\infty(M)\), the <strong>Hamiltonian vector field</strong> is:
+  </p>
+
+  <p class="math">
+    \[
+      X_H(f) = \{f,H\},\qquad \forall f\in C^\infty(M).
+    \]
+  </p>
+
+  <p>
+    Equivalently,
+  </p>
+
+  <p class="math">
+    \[
+      X_H = \pi^\sharp(dH),
+    \]
+  </p>
+
+  <p>
+    where <span class="math">\(\pi^\sharp: T^*M\to TM\)</span> is contraction with \(\pi\):
+  </p>
+
+  <p class="math">
+    \[
+      \pi^\sharp(\alpha) = \pi(\alpha,\cdot).
+    \]
+  </p>
+
+  <p>
+    Thus, Poisson geometry generalises symplectic dynamics to allow degeneracy.
+  </p>
+
+  <hr/>
+
+  <!-- 2.4.4 -->
+  <h3 id="sec-2-4-4">2.4.4 Symplectic Leaves</h3>
+
+  <p>
+    If \(\pi(x)\) has rank \(2k(x)\), we define the distribution
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{D}_x = \pi^\sharp(T_x^* M)\subset T_xM.
+    \]
+  </p>
+
+  <p>
+    The <strong>Stefan–Sussmann theorem</strong> implies that this integrable 
+    distribution defines a foliation of \(M\) into immersed submanifolds 
+    <strong>symplectic leaves</strong> \(S\subset M\), on which:
+  </p>
+
+  <ul>
+    <li>\(\pi\) has constant rank,</li>
+    <li>the restriction \(\omega_S = \pi^{-1}\) defines a bona fide symplectic form,</li>
+    <li>Hamiltonian vector fields are tangent to leaves.</li>
+  </ul>
+
+  <figure id="fig-2-8" style="text-align:center;">
+    <svg width="500" height="260" style="border:1px solid #ccc;">
+      <!-- Draw big ellipsoid representing manifold -->
+      <ellipse cx="250" cy="130" rx="200" ry="110"
+               fill="#eef" stroke="#99c" stroke-width="2"/>
+      <text x="190" y="35" font-size="14">Poisson manifold M</text>
+
+      <!-- Two symplectic leaves -->
+      <ellipse cx="250" cy="120" rx="120" ry="40"
+               fill="#cfc" stroke="#393" stroke-width="2"/>
+      <text x="245" y="120" font-size="12" text-anchor="middle">
+        Symplectic leaf S₁
+      </text>
+
+      <ellipse cx="250" cy="190" rx="90" ry="30"
+               fill="#fcc" stroke="#933" stroke-width="2"/>
+      <text x="250" y="190" font-size="12" text-anchor="middle">
+        Symplectic leaf S₂
+      </text>
+    </svg>
+    <figcaption>
+      <strong>Figure 2.8</strong> – A Poisson manifold foliated by symplectic leaves.
+    </figcaption>
+  </figure>
+
+  <p>
+    Poisson manifolds are therefore “stratified symplectic manifolds”.
+  </p>
+
+  <hr/>
+
+  <!-- 2.4.5 -->
+  <h3 id="sec-2-4-5">2.4.5 Poisson Maps</h3>
+
+  <p>
+    A smooth map <span class="math">\(F: (M,\pi_M)\to (N,\pi_N)\)</span> is a 
+    <strong>Poisson map</strong> if:
+  </p>
+
+  <p class="math">
+    \[
+      \{f\circ F, g\circ F\}_M = \{f,g\}_N \circ F
+      \qquad \forall f,g\in C^\infty(N).
+    \]
+  </p>
+
+  <p>
+    Example: symplectic maps are Poisson maps with respect to the canonical bracket.
+  </p>
+
+  <p>
+    In geometric numerical integration, a <strong>Poisson integrator</strong> satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      \{f,g\}\circ \Phi_h = \{f\circ \Phi_h,\, g\circ \Phi_h\},
+    \]
+  </p>
+
+  <p>
+    which generalises structure preservation when the system is not symplectic globally.
+  </p>
+
+  <hr/>
+
+  <!-- 2.4.6 -->
+  <h3 id="sec-2-4-6">2.4.6 Lie–Poisson Brackets (Rigid Body as Example)</h3>
+
+  <p>
+    A fundamental class of Poisson manifolds arises from Lie algebras.  
+    If \(G\) is a Lie group with Lie algebra \(\mathfrak{g}\), then the dual 
+    space <span class="math">\(\mathfrak{g}^*\)</span> carries a natural Poisson structure:
+  </p>
+
+  <p class="math">
+    \[
+      \{F,G\}(\mu)
+      = \langle \mu,\; [dF(\mu), dG(\mu)] \rangle,
+    \]
+  </p>
+
+  <p>
+    where the bracket is the Lie bracket on \(\mathfrak{g}\).
+  </p>
+
+  <h4>Rigid body</h4>
+
+  <p>
+    Take \(\mathfrak{g} = \mathfrak{so}(3)\cong\mathbb{R}^3\) with cross product.
+    Then the Lie–Poisson equations are Euler’s equations:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{L} = L \times \nabla H(L),
+    \]
+  </p>
+
+  <p>
+    where \(L\in\mathbb{R}^3\) is angular momentum.
+  </p>
+
+  <p>
+    Symplectic leaves are spheres \(||L||=\mathrm{const}\).
+  </p>
+
+  <figure id="fig-2-9" style="text-align:center;">
+    <svg width="300" height="230" style="border:1px solid #ccc;">
+      <circle cx="150" cy="115" r="80" fill="#eef" stroke="#99c" stroke-width="2"/>
+      <text x="150" y="25" font-size="14" text-anchor="middle">
+        Symplectic leaf: sphere |L| = const
+      </text>
+      <line x1="150" y1="115" x2="190" y2="60"
+            stroke="#c33" stroke-width="3" marker-end="url(#arr_sph)"/>
+      <text x="195" y="55" font-size="12">X_H</text>
+
+      <defs>
+        <marker id="arr_sph" markerWidth="12" markerHeight="12"
+                refX="5" refY="6" orient="auto">
+          <path d="M0,0 L0,12 L12,6 z" fill="#c33"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>
+      <strong>Figure 2.9</strong> – Lie–Poisson dynamics for the free rigid body.
+      The motion is confined to a sphere, a symplectic leaf of \(\mathfrak{so}(3)^*\).
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 2.4.7 -->
+  <h3 id="sec-2-4-7">2.4.7 Interactive Demo: Lie–Poisson Flow on a Sphere</h3>
+
+  <p>
+    The following JavaScript simulation shows a simple Lie–Poisson flow on the unit
+    sphere:
+  </p>
+
+  <p class="math">
+    \[
+    \dot{L} = L \times (A L),
+    \]
+  </p>
+
+  <p>
+    where \(A=\mathrm{diag}(a_1,a_2,a_3)\) models anisotropic rigid body inertia.
+  </p>
+
+  <figure id="fig-2-10" style="text-align:center;">
+    <canvas id="liePoissonCanvas" width="400" height="300"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 2.10</strong> – Numerical trace of a Lie–Poisson flow projected onto the sphere.
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas = document.getElementById("liePoissonCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    const w=canvas.width, h=canvas.height;
+    const cx=w/2, cy=h/2, R=110;
+    ctx.clearRect(0,0,w,h);
+
+    // parameters
+    const A=[1,2,3];  // distinct inertias for demo
+    let L=[0.1,0.9,0.3];
+    const dt=0.03;
+
+    function normalize(v){
+      const n=Math.hypot(v[0],v[1],v[2]); return [v[0]/n,v[1]/n,v[2]/n];
+    }
+    L = normalize(L);
+
+    function cross(a,b){
+      return [
+        a[1]*b[2]-a[2]*b[1],
+        a[2]*b[0]-a[0]*b[2],
+        a[0]*b[1]-a[1]*b[0]
+      ];
+    }
+
+    function step(){
+      const AL=[A[0]*L[0], A[1]*L[1], A[2]*L[2]];
+      const dL=cross(L,AL);
+      L=[L[0]+dt*dL[0], L[1]+dt*dL[1], L[2]+dt*dL[2]];
+      L=normalize(L);
+    }
+
+    function project(L){
+      // simple orthographic projection
+      return [cx + R*L[0], cy - R*L[1]];
+    }
+
+    function draw(){
+      ctx.clearRect(0,0,w,h);
+
+      // sphere outline
+      ctx.beginPath();
+      ctx.arc(cx,cy,R,0,2*Math.PI);
+      ctx.strokeStyle="#666"; ctx.lineWidth=2; ctx.stroke();
+
+      // current point
+      const p=project(L);
+      ctx.beginPath();
+      ctx.arc(p[0],p[1],5,0,2*Math.PI);
+      ctx.fillStyle="#c00"; ctx.fill();
+    }
+
+    function animate(){
+      step();
+      draw();
+      requestAnimationFrame(animate);
+    }
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 2.4.8 -->
+  <h3 id="sec-2-4-8">2.4.8 Summary</h3>
+
+  <p>
+    In this section we introduced the Poisson generalisation of Hamiltonian 
+    mechanics:
+  </p>
+
+  <ul>
+    <li>Definition of Poisson bracket via the Poisson tensor.</li>
+    <li>Hamiltonian vector fields on a Poisson manifold.</li>
+    <li>Foliation into symplectic leaves.</li>
+    <li>Poisson maps and their role in structure-preserving numerical integration.</li>
+    <li>Lie–Poisson systems and rigid body dynamics as canonical examples.</li>
+  </ul>
+
+  <p>
+    These ideas underpin geometric numerical integration for systems 
+    that are <em>not globally symplectic</em>—particularly Lie–Poisson integration, 
+    splitting on noncanonical brackets, and reduced systems.
+  </p>
+
+  <hr/>
+
+  <!-- 2.4.9 -->
+  <h3 id="sec-2-4-9">2.4.9 References for Section 2.4</h3>
+
+  <ol>
+    <li><strong>[Vai94]</strong>
+      I. Vaisman,
+      <em>Lectures on the Geometry of Poisson Manifolds</em>,
+      Birkhäuser, 1994.
+    </li>
+    <li><strong>[Lib13]</strong>
+      A. Libermann &amp; C. Marle,
+      <em>Symplectic Geometry and Analytical Mechanics</em>,
+      Springer, 2013.
+    </li>
+    <li><strong>[MR99]</strong>
+      J.E. Marsden &amp; T. Ratiu,
+      <em>Introduction to Mechanics and Symmetry</em>,
+      Springer, 1999.
+    </li>
+    <li><strong>[HLW06]</strong>
+      E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration</em>, Springer, 2006.
+    </li>
+    <li><strong>[BC26]</strong>
+      S. Blanes &amp; F. Casas,
+      <em>Concise Introduction to GNI</em>, 2nd ed.,
+      CRC Press, 2026.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-2-5">
+  <h2>2.5 Darboux’s Theorem and Canonical Coordinates</h2>
+
+  <p>
+    One of the most profound results in symplectic geometry is that it admits
+    <em>no local invariants</em>.
+    Unlike Riemannian geometry—where curvature, torsion, and other invariants
+    distinguish local geometries—every symplectic structure looks locally
+    identical to the standard canonical form.
+  </p>
+
+  <p>
+    This is the content of <strong>Darboux’s theorem</strong>.
+    It implies that Hamilton’s equations always admit canonical coordinates
+    \((q,p)\) locally, regardless of global geometry, topology, or constraints.
+  </p>
+
+  <hr/>
+
+  <!-- 2.5.1 -->
+  <h3 id="sec-2-5-1">2.5.1 Statement of Darboux’s Theorem</h3>
+
+  <p><strong>Theorem 2.5 (Darboux).</strong>
+    Let \((M,\omega)\) be a symplectic manifold of dimension \(2m\).
+    For every point \(x\in M\), there exists a coordinate chart
+  </p>
+
+  <p class="math">
+    \[
+      (U; q_1,\dots,q_m, p_1,\dots,p_m)
+    \]
+  </p>
+
+  <p>
+    such that on \(U\):
+  </p>
+
+  <p class="math">
+    \[
+      \omega = \sum_{i=1}^m dq_i \wedge dp_i.
+    \]
+  </p>
+
+  <p>
+    In other words, <em>all symplectic manifolds are locally canonical</em>.
+  </p>
+
+  <p>
+    No metric, no curvature, no Christoffel symbols: symplectic geometry has no
+    local invariants.
+  </p>
+
+  <hr/>
+
+  <!-- 2.5.2 -->
+  <h3 id="sec-2-5-2">2.5.2 Geometric Meaning</h3>
+
+  <p>
+    Darboux’s theorem tells us that:
+  </p>
+
+  <ul>
+    <li>The symplectic form \(\omega\) is <em>locally exact</em>:
+      <span class="math">\(\omega = d\theta\)</span>.</li>
+    <li>There always exist “position–momentum” variables \((q_i,p_i)\).</li>
+    <li>
+      Symplectic manifolds have no local moduli:  
+      every point has a neighbourhood symplectomorphic to an open set of
+      <span class="math">\(\mathbb{R}^{2m}\)</span> with the standard form.
+    </li>
+    <li>
+      All Hamiltonian systems are <em>locally equivalent</em> to standard
+      canonical Hamiltonian mechanics.
+    </li>
+  </ul>
+
+  <p>
+    The importance for numerical integration is immense:
+  </p>
+
+  <ul>
+    <li>Canonical integrators (e.g., Störmer–Verlet) apply locally on any symplectic manifold.</li>
+    <li>Local structure preservation implies global qualitative faithfulness.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 2.5.3 -->
+  <h3 id="sec-2-5-3">2.5.3 Sketch of Proof (Moser’s Argument)</h3>
+
+  <p>
+    The classical proof uses <strong>Moser’s method</strong>.
+    The idea is to connect the given symplectic form \(\omega\) to the canonical
+    form \(\omega_0\) smoothly, and construct a diffeomorphism that carries one
+    to the other.
+  </p>
+
+  <ol>
+    <li>
+      Choose local coordinates near a point so that
+      <span class="math">\(\omega(x) = \omega_0\)</span> at the point.
+    </li>
+
+    <li>
+      Define a 1-parameter family of forms:
+      <span class="math">
+        \[
+        \omega_t = (1-t)\omega_0 + t\omega, \qquad t\in[0,1].
+        \]
+      </span>
+    </li>
+
+    <li>
+      Solve Moser’s equation for a time-dependent vector field \(X_t\):
+      <span class="math">
+        \[
+        i_{X_t}\,\omega_t = -\alpha, \qquad \text{with } \omega - \omega_0 = d\alpha.
+        \]
+      </span>
+    </li>
+
+    <li>
+      Integrate \(X_t\) to obtain an isotopy \(\varphi_t\).
+    </li>
+
+    <li>
+      Check that:
+      <span class="math">
+        \[
+        \frac{d}{dt}\varphi_t^*\omega_t = 0
+        \Rightarrow \varphi_1^*\omega = \omega_0.
+        \]
+      </span>
+    </li>
+  </ol>
+
+  <p>
+    Thus, \(\varphi_1\) gives the desired canonical coordinates.
+  </p>
+
+  <figure id="fig-2-11" style="text-align:center;">
+    <svg width="500" height="250" style="border:1px solid #ccc;">
+      <!-- start and end symplectic forms -->
+      <rect x="60" y="90" width="120" height="80"
+            fill="#eef" stroke="#66a" stroke-width="2"/>
+      <text x="120" y="83" font-size="13" text-anchor="middle">
+        ω₀ (canonical)
+      </text>
+
+      <rect x="320" y="90" width="120" height="80"
+            fill="#fee" stroke="#a66" stroke-width="2"/>
+      <text x="380" y="83" font-size="13" text-anchor="middle">
+        ω (general)
+      </text>
+
+      <!-- arrow -->
+      <line x1="180" y1="130" x2="320" y2="130"
+            stroke="#000" stroke-width="2"
+            marker-end="url(#arr_D)"/>
+
+      <text x="250" y="118" font-size="12" text-anchor="middle">
+        φ₁ (symplectomorphism)
+      </text>
+
+      <defs>
+        <marker id="arr_D" markerWidth="10" markerHeight="10"
+                refX="5" refY="5" orient="auto">
+          <path d="M0,0 L0,10 L10,5 z" fill="#000"/>
+        </marker>
+      </defs>
+    </svg>
+
+    <figcaption>
+      <strong>Figure 2.11</strong> – Moser’s argument: constructing a flow that
+      takes a general symplectic form to the canonical one.
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 2.5.4 -->
+  <h3 id="sec-2-5-4">2.5.4 Canonical Poisson Bracket Appears Automatically</h3>
+
+  <p>
+    In Darboux coordinates, the Poisson tensor becomes:
+  </p>
+
+  <p class="math">
+    \[
+      \pi =
+      \begin{pmatrix}
+      0 & I \\ -I & 0
+      \end{pmatrix},
+    \qquad
+    \{q_i,p_j\} = \delta_{ij},\quad \{q_i,q_j\}=0,\quad \{p_i,p_j\}=0.
+    \]
+  </p>
+
+  <p>
+    Hence, Hamilton’s equations take their standard form:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{q}_i = \frac{\partial H}{\partial p_i},
+      \qquad
+      \dot{p}_i = -\frac{\partial H}{\partial q_i}.
+    \]
+  </p>
+
+  <p>
+    The appearance of these equations is not tied to special coordinates:
+    <strong>every Hamiltonian system is locally canonical.</strong>
+  </p>
+
+  <hr/>
+
+  <!-- 2.5.5 -->
+  <h3 id="sec-2-5-5">2.5.5 Consequences for Geometric Numerical Integration</h3>
+
+  <p>
+    Darboux’s theorem implies:
+  </p>
+
+  <ul>
+    <li>
+      <strong>All symplectic integrators are formulated in canonical coordinates
+      without loss of generality.</strong>
+    </li>
+
+    <li>
+      Structure-preserving algorithms apply on any symplectic manifold
+      through local charts.
+    </li>
+
+    <li>
+      Global topology affects global behavior, but not the local structure of
+      Hamiltonian flows.
+    </li>
+
+    <li>
+      Numerically, canonical coordinates allow:
+      <ul>
+        <li>local symplectic discretisation,</li>
+        <li>splitting methods,</li>
+        <li>variational integrators,</li>
+        <li>explicit computations of flows of separable Hamiltonians.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <p>
+    The theorem is therefore foundational for the entire numerical theory in
+    later chapters.
+  </p>
+
+  <hr/>
+
+  <!-- 2.5.6 -->
+  <h3 id="sec-2-5-6">2.5.6 Relation to Poisson Geometry (From Section 2.4)</h3>
+
+  <p>
+    Darboux’s theorem has no analogue on Poisson manifolds:
+  </p>
+
+  <ul>
+    <li>Poisson tensors may have varying rank.</li>
+    <li>Symplectic leaves may be curved or not even embedded.</li>
+    <li>No universal local normal form exists globally on a Poisson manifold.</li>
+  </ul>
+
+  <p>
+    However:
+  </p>
+
+  <ul>
+    <li>Each symplectic leaf <em>does</em> admit Darboux coordinates.</li>
+    <li>
+      Thus Lie–Poisson systems evolve on manifolds that are locally symplectic
+      hypersurfaces.
+    </li>
+  </ul>
+
+  <hr/>
+
+  <!-- 2.5.7 -->
+  <h3 id="sec-2-5-7">2.5.7 References for Section 2.5</h3>
+
+  <ol>
+    <li><strong>[Arn89]</strong> V. Arnol'd,
+      <em>Mathematical Methods of Classical Mechanics</em>, Springer, 1989.</li>
+
+    <li><strong>[MS17]</strong> McDuff &amp; Salamon,
+      <em>Introduction to Symplectic Topology</em>, OUP, 2017.</li>
+
+    <li><strong>[Wei71]</strong> A. Weinstein,
+      “Symplectic manifolds and their Lagrangian submanifolds”,  
+      <em>Advances in Mathematics</em>, 1971.</li>
+
+    <li><strong>[HLW06]</strong> Hairer, Lubich, Wanner,
+      <em>Geometric Numerical Integration</em>, Springer, 2006.</li>
+
+    <li><strong>[BC26]</strong> Blanes &amp; Casas,  
+      <em>Concise Introduction to GNI</em>, 2nd ed., CRC Press, 2026.</li>
+  </ol>
+
+</section>
+
+<section id="sec-2-6">
+  <h2>2.6 Lie–Poisson Reduction and Coadjoint Orbits</h2>
+
+  <p>
+    In previous sections we saw:
+  </p>
+
+  <ul>
+    <li>Hamiltonian systems on symplectic manifolds (Sections 2.1–2.3),</li>
+    <li>Poisson manifolds as a generalisation (Section 2.4),</li>
+    <li>Darboux’s theorem ensuring local canonical form (Section 2.5).</li>
+  </ul>
+
+  <p>
+    We now treat <strong>Lie–Poisson reduction</strong> — one of the deepest links between
+    symmetry, geometry, and Hamiltonian mechanics.  
+    It explains why systems such as:
+  </p>
+
+  <ul>
+    <li>rigid body dynamics,</li>
+    <li>ideal fluid mechanics (Euler equations),</li>
+    <li>plasmas (Vlasov–Poisson),</li>
+    <li>beam dynamics and kinetic equations,</li>
+    <li>quantum spin systems,</li>
+  </ul>
+
+  <p>
+    evolve on dual Lie algebras and preserve the <em>coadjoint orbit</em> structure.
+  </p>
+
+  <p>
+    This section provides the foundation for <strong>Lie–Poisson integrators</strong>,
+    which appear later in geometric numerical integration: algorithms that
+    preserve Casimirs, coadjoint orbits, and Lie–Poisson brackets exactly.
+  </p>
+
+  <hr/>
+
+  <!-- 2.6.1 -->
+  <h3 id="sec-2-6-1">2.6.1 Motivation: Reduction by Symmetry</h3>
+
+  <p>
+    Suppose a Hamiltonian system has a symmetry group \(G\).  
+    By Noether’s theorem:
+  </p>
+
+  <p class="math">
+    \[
+    \text{symmetry} \;\Rightarrow\; \text{momentum map} \;\Rightarrow\; \text{conserved quantity}.
+    \]
+  </p>
+
+  <p>
+    Reduction asks the opposite question:
+  </p>
+
+  <blockquote>
+    <p><em>Can we eliminate redundant degrees of freedom introduced by symmetry?</em></p>
+  </blockquote>
+
+  <p>
+    For instance, the rigid body rotation group \(SO(3)\) acts freely on the
+    configuration space.  
+    By reducing the symmetry, the true dynamics live not on the tangent bundle
+    of the group but on <span class="math">\(\mathfrak{so}(3)^*\cong\mathbb{R}^3\)</span>.
+  </p>
+
+  <hr/>
+
+  <!-- 2.6.2 -->
+  <h3 id="sec-2-6-2">2.6.2 The Coadjoint Action</h3>
+
+  <p>
+    Let \(G\) be a Lie group with Lie algebra \(\mathfrak{g}\).
+    The <strong>adjoint action</strong> of \(G\) on \(\mathfrak{g}\) is:
+  </p>
+
+  <p class="math">
+    \[
+      \mathrm{Ad}_g(X) := g X g^{-1}.
+    \]
+  </p>
+
+  <p>
+    Dualising gives the <strong>coadjoint action</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      \mathrm{Ad}^*_g : \mathfrak{g}^* \to \mathfrak{g}^*, \qquad
+      \langle \mathrm{Ad}_g^*\mu, X\rangle = \langle \mu, \mathrm{Ad}_{g^{-1}}X\rangle.
+    \]
+  </p>
+
+  <p>
+    The orbits of this action,
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{O}_\mu = \{\mathrm{Ad}_g^*\mu : g\in G\},
+    \]
+  </p>
+
+  <p>
+    are called <strong>coadjoint orbits</strong>.
+  </p>
+
+  <p>
+    Crucially:
+  </p>
+
+  <blockquote>
+    <strong>Coadjoint orbits are naturally symplectic manifolds.</strong>  
+  </blockquote>
+
+  <hr/>
+
+  <!-- 2.6.3 -->
+  <h3 id="sec-2-6-3">2.6.3 Kirillov–Kostant–Souriau (KKS) Symplectic Form</h3>
+
+  <p>
+    Each coadjoint orbit \(\mathcal{O}_\mu\subset \mathfrak{g}^*\) carries a
+    canonical symplectic form defined as follows.
+  </p>
+
+  <p class="math">
+    \[
+      \omega_\mu(\xi_{\mathfrak{g}^*},\eta_{\mathfrak{g}^*})
+      = \langle \mu,\;[\xi,\eta]\rangle.
+    \]
+  </p>
+
+  <p>
+    Here \(\xi_{\mathfrak{g}^*}\) is the infinitesimal generator of the
+    coadjoint action associated with \(\xi\in\mathfrak{g}\):
+  </p>
+
+  <p class="math">
+    \[
+      \xi_{\mathfrak{g}^*}(\mu) = \mathrm{ad}_\xi^*\mu.
+    \]
+  </p>
+
+  <p>
+    Thus each coadjoint orbit is a symplectic leaf of the Lie–Poisson bracket
+    of Section 2.4.
+  </p>
+
+  <figure id="fig-2-12" style="text-align:center;">
+    <svg width="480" height="240" style="border:1px solid #ccc;">
+      <text x="180" y="20" font-size="14">Symplectic leaf (coadjoint orbit)</text>
+
+      <!-- Big ellipse for g* -->
+      <ellipse cx="240" cy="120" rx="200" ry="90"
+               fill="#eef" stroke="#99c" stroke-width="2"/>
+      <text x="240" y="210" font-size="12" text-anchor="middle">
+        Dual algebra 𝔤*
+      </text>
+
+      <!-- A coadjoint orbit inside -->
+      <ellipse cx="240" cy="120" rx="110" ry="45"
+               fill="#cfc" stroke="#393" stroke-width="2"/>
+      <text x="240" y="120" font-size="12" text-anchor="middle">
+        Orbit 𝒪<sub>μ</sub>
+      </text>
+    </svg>
+
+    <figcaption>
+      <strong>Figure 2.12</strong> –  
+      A coadjoint orbit appears as a symplectic leaf in the Lie–Poisson manifold 
+      \(\mathfrak{g}^*\).
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 2.6.4 -->
+  <h3 id="sec-2-6-4">2.6.4 Lie–Poisson Bracket on 𝔤*</h3>
+
+  <p>
+    For \(\mathfrak{g}^*\) the Poisson bracket of functions \(F,G\) is:
+  </p>
+
+  <p class="math">
+    \[
+      \{F,G\}(\mu) = 
+      \langle \mu,\; [dF(\mu), dG(\mu)] \rangle.
+    \]
+  </p>
+
+  <ul>
+    <li>The symplectic leaves are the coadjoint orbits.</li>
+    <li>Casimirs are invariants constant on orbits.</li>
+    <li>Hamiltonian dynamics are tangent to each orbit.</li>
+  </ul>
+
+  <p>
+    This provides a direct bridge between symmetry reduction and Poisson geometry.
+  </p>
+
+  <hr/>
+
+  <!-- 2.6.5 -->
+  <h3 id="sec-2-6-5">2.6.5 Euler–Poincaré and Lie–Poisson Equations</h3>
+
+  <p>
+    Consider a Hamiltonian \(H:\mathfrak{g}^*\to\mathbb{R}\).  
+    The Hamiltonian vector field on the Poisson manifold \(\mathfrak{g}^*\) is:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{\mu} = \mathrm{ad}^*_{\nabla H(\mu)} \mu.
+    \]
+  </p>
+
+  <p>
+    This is the <strong>Lie–Poisson equation</strong>.
+  </p>
+
+  <h4>Example: Rigid Body</h4>
+
+  <p>
+    For \(\mathfrak{so}(3)^*\cong\mathbb{R}^3\):
+  </p>
+
+  <p class="math">
+    \[
+      \dot{L} = L \times \Omega, \qquad 
+      \Omega = \nabla H(L) = (I^{-1}L).
+    \]
+  </p>
+
+  <p>
+    This yields Euler’s equations of rigid body rotation —  
+    a Hamiltonian flow on the sphere \(|L|=\mathrm{const}\).
+  </p>
+
+  <hr/>
+
+  <!-- 2.6.6 -->
+  <h3 id="sec-2-6-6">2.6.6 Casimirs and Reduced Phase Space</h3>
+
+  <p>
+    A <strong>Casimir</strong> on a Poisson manifold satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      \{C,F\} = 0\qquad\forall F.
+    \]
+  </p>
+
+  <p>
+    On a Lie–Poisson manifold \(\mathfrak{g}^*\), Casimirs label the symplectic leaves.
+  </p>
+
+  <h4>Example: rigid body</h4>
+
+  <p class="math">
+    \[
+      C(L) = \|L\|^2
+    \]
+  </p>
+
+  <p>
+    is a Casimir.  
+    It defines spherical leaves:
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{O}_r = \{L\in\mathbb{R}^3 : \|L\|= r\}.
+    \]
+  </p>
+
+  <p>
+    A Lie–Poisson integrator must preserve Casimirs exactly —  
+    a primary requirement in geometric numerical integration.
+  </p>
+
+  <hr/>
+
+  <!-- 2.6.7 -->
+  <h3 id="sec-2-6-7">2.6.7 Interactive Demo: Coadjoint Orbit Motion</h3>
+
+  <p>
+    The following JavaScript simulation shows motion on a coadjoint orbit
+    for the \(\mathfrak{so}(3)^*\) example:
+  </p>
+
+  <figure id="fig-2-13" style="text-align:center;">
+    <canvas id="orbitCanvas" width="420" height="300"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 2.13</strong> – Flow on a coadjoint orbit (unit sphere).
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("orbitCanvas");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+    const cx=w/2, cy=h/2, R=120;
+    // inertia parameters
+    const A=[1,2,4];
+    let L=[0.3,0.7,0.6];
+    const dt=0.02;
+
+    function norm(v){ return Math.hypot(v[0],v[1],v[2]); }
+    function normalize(v){ const n=norm(v); return [v[0]/n,v[1]/n,v[2]/n]; }
+    L=normalize(L);
+
+    function cross(a,b){
+      return [
+        a[1]*b[2]-a[2]*b[1],
+        a[2]*b[0]-a[0]*b[2],
+        a[0]*b[1]-a[1]*b[0]
+      ];
+    }
+
+    function step(){
+      const AL=[A[0]*L[0],A[1]*L[1],A[2]*L[2]];
+      const dL=cross(L,AL);
+      L=[L[0]+dt*dL[0],L[1]+dt*dL[1],L[2]+dt*dL[2]];
+      L=normalize(L);
+    }
+
+    function proj(v){ return [cx+R*v[0], cy-R*v[1]]; }
+
+    function draw(){
+      ctx.clearRect(0,0,w,h);
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,2*Math.PI);
+      ctx.strokeStyle="#666"; ctx.lineWidth=2; ctx.stroke();
+      const p=proj(L);
+      ctx.beginPath(); ctx.arc(p[0],p[1],6,0,2*Math.PI);
+      ctx.fillStyle="#c00"; ctx.fill();
+    }
+
+    (function animate(){
+      step(); draw(); requestAnimationFrame(animate);
+    })();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 2.6.8 -->
+  <h3 id="sec-2-6-8">2.6.8 Summary</h3>
+
+  <p>
+    In this section we developed the geometric machinery of reduced Hamiltonian
+    systems:
+  </p>
+
+  <ul>
+    <li>Coadjoint action and coadjoint orbits,</li>
+    <li>KKS symplectic structure,</li>
+    <li>Lie–Poisson brackets on dual Lie algebras,</li>
+    <li>Euler–Poincaré and Lie–Poisson equations,</li>
+    <li>Casimirs and reduced dynamics,</li>
+    <li>Hamiltonian flows restricted to symplectic leaves.</li>
+  </ul>
+
+  <p>
+    This geometric background is essential for numerical methods that preserve:
+  </p>
+
+  <ul>
+    <li>Casimirs,</li>
+    <li>coadjoint orbits,</li>
+    <li>Lie–Poisson brackets,</li>
+    <li>energy behaviour,</li>
+    <li>long-time invariants of reduced systems.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 2.6.9 -->
+  <h3 id="sec-2-6-9">2.6.9 References for Section 2.6</h3>
+
+  <ol>
+    <li><strong>[MR99]</strong> Marsden &amp; Ratiu,
+      <em>Introduction to Mechanics and Symmetry</em>, Springer, 1999.</li>
+
+    <li><strong>[Arn89]</strong> Arnol'd,
+      <em>Mathematical Methods of Classical Mechanics</em>, Springer, 1989.</li>
+
+    <li><strong>[Hol08]</strong> Holm,
+      <em>Geometric Mechanics: Part II</em>, Imperial College Press, 2008.</li>
+
+    <li><strong>[Wei83]</strong> Weinstein,
+      “The local structure of Poisson manifolds”,
+      <em>J. Differential Geometry</em>, 1983.</li>
+
+    <li><strong>[HLW06]</strong> Hairer, Lubich, Wanner,
+      <em>Geometric Numerical Integration</em>, Springer, 2006.</li>
+
+    <li><strong>[BC26]</strong> Blanes &amp; Casas,
+      <em>Concise Introduction to GNI (2nd ed.)</em>, CRC Press, 2026.</li>
+  </ol>
+
+</section>
+
+<hr />
+<nav style="background:#eee; padding:0.5em; margin-top:1em;">
+    <a href="chapter01.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a href="chapter03.html">Next</a>
+</nav>
+</body>
+
+</html>

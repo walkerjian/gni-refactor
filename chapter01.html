@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 1 - Geometric Numerical Integration</title>
+    <style>
+        body {
+            font-family: serif;
+            line-height: 1.5;
+            margin: 2em;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: Georgia, serif;
+        }
+
+        code {
+            background: #eee;
+            padding: 2px 4px;
+        }
+
+        .task {
+            color: #777;
+            font-style: italic;
+        }
+
+        a {
+            text-decoration: none;
+            color: #006;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>1. Foundations of Geometric Numerical Integration</h1>
+    <nav style="background:#eee; padding:0.5em; margin-bottom:1em;">
+        <a href="toc.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a href="chapter02.html">Next</a>
+    </nav>
+    <hr /><section id="sec-1-1">
+  <h2>1.1 What is Geometric Numerical Integration?</h2>
+
+  <p>
+    <strong>Geometric Numerical Integration (GNI)</strong> is the study and design of numerical
+    methods for differential equations that preserve the underlying
+    <em>geometric structures</em> of the exact flow: symplectic forms, invariants, symmetries,
+    constraints, and manifold structure. Rather than focusing solely on minimizing local
+    truncation error at a fixed time, GNI asks:
+  </p>
+
+  <blockquote>
+    <em>Can a numerical method approximate not only the solution values, but the
+    qualitative, structural behaviour of the continuous dynamical system, especially
+    over long times?</em>
+  </blockquote>
+
+  <p>
+    This viewpoint is synthesized in the monograph by Hairer, Lubich, and Wanner
+    <span class="citation">[HLW06]</span>, and is presented concisely in Blanes &amp; Casas
+    <span class="citation">[BC26]</span>, on which this companion is based.  [oai_citation:0‡Université Paris 13](https://www.math.univ-paris13.fr/~cuvelier/docs/Enseignements/Energetique/AnaNumII/12-13/TP1/G3/Geometric_Numerical_Integration_-_Hairer_Chap1.pdf?utm_source=chatgpt.com)
+  </p>
+
+  <p>
+    To motivate the subject, we begin from first principles: flows of ordinary
+    differential equations, their geometric properties, and the limitations of
+    traditional error-centric numerical analysis.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-1-1">1.1.1 Differential Equations and Flows</h3>
+
+  <p>
+    Consider an autonomous system of ordinary differential equations (ODEs)
+  </p>
+
+  <p class="math">
+    \[
+      \dot{y}(t) = f(y(t)), \qquad y(t) \in \mathbb{R}^d, \quad f : \mathbb{R}^d \to \mathbb{R}^d.
+    \]
+  </p>
+
+  <p>
+    Under standard assumptions (e.g. locally Lipschitz \(f\)), for any initial
+    state \(y_0 \in \mathbb{R}^d\) and time \(t\) in some interval containing \(0\),
+    there exists a unique solution \(y(t; y_0)\). The mapping
+  </p>
+
+  <p class="math">
+    \[
+      \varphi^t : \mathbb{R}^d \to \mathbb{R}^d, 
+      \qquad \varphi^t(y_0) := y(t; y_0)
+    \]
+  </p>
+
+  <p>
+    is called the <strong>flow</strong> of the ODE at time \(t\). For an autonomous system,
+    the family \(\{\varphi^t\}_{t\in I}\) satisfies the <em>flow (group) properties</em>:
+  </p>
+
+  <ul>
+    <li><strong>Identity:</strong> \(\varphi^0 = \mathrm{id}\).</li>
+    <li><strong>Composition (group law):</strong> \(\varphi^{t+s} = \varphi^t \circ \varphi^s\) whenever both sides are defined.</li>
+    <li><strong>Invertibility:</strong> For each fixed \(t\), \(\varphi^t\) is a diffeomorphism (under suitable smoothness assumptions), with inverse \(\varphi^{-t}\).</li>
+  </ul>
+
+  <p>
+    At this level, numerical methods are approximations of the one-step map
+    \(\varphi^h\) for some timestep \(h\):
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1} = \Phi_h(y_n) \approx \varphi^h(y_n).
+    \]
+  </p>
+
+  <p>
+    The key idea in GNI is to treat \(\Phi_h\) itself as a <em>discrete dynamical system</em>
+    and to study how well it reproduces the geometric and qualitative properties of
+    \(\varphi^t\), especially for long-time integration.
+  </p>
+
+  <h4>Geometric viewpoint: phase space and invariants</h4>
+
+  <p>
+    The phase space \(\mathbb{R}^d\) is often endowed with additional structure:
+  </p>
+
+  <ul>
+    <li>
+      A <strong>symplectic form</strong> \(\omega\) (for Hamiltonian systems),
+      making \((\mathbb{R}^{2m}, \omega)\) a symplectic manifold.
+    </li>
+    <li>
+      A <strong>Riemannian metric</strong> \(g\) (for gradient flows).
+    </li>
+    <li>
+      A <strong>constraint manifold</strong> \(M \subseteq \mathbb{R}^d\) (e.g. motion on a sphere).
+    </li>
+    <li>
+      A <strong>volume form</strong> (e.g. divergence-free flows).
+    </li>
+  </ul>
+
+  <p>
+    The exact flow \(\varphi^t\) typically preserves some or all of these structures:
+  </p>
+
+  <ul>
+    <li>
+      <em>First integrals</em> (invariants):
+      <span class="math">\(\;I : \mathbb{R}^d \to \mathbb{R}\; \)</span> such that
+      <span class="math">\(\;I(\varphi^t(y_0)) = I(y_0)\; \forall t\).</span>
+    </li>
+    <li>
+      <em>Symplecticity:</em> \((\varphi^t)^*\omega = \omega\), i.e. the pullback of the symplectic form is itself.
+    </li>
+    <li>
+      <em>Reversibility:</em> for some involution \(R\) (with \(R^2 = \mathrm{id}\)),
+      we may have \(R\circ \varphi^t \circ R = \varphi^{-t}\).
+    </li>
+    <li>
+      <em>Volume preservation:</em> \(\det D\varphi^t(y) = 1\) (Liouville’s theorem for Hamiltonian flows).
+    </li>
+  </ul>
+
+  <p>
+    Geometric integrators are numerical methods \(\Phi_h\) that <em>exactly</em> preserve
+    some of these properties for the discrete dynamics \(y_{n+1} = \Phi_h(y_n)\),
+    regardless of step-size (within stability limits).
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-1-2">1.1.2 Traditional vs Geometric Numerical Analysis</h3>
+
+  <p>
+    Classical numerical analysis for ODEs emphasizes:
+  </p>
+
+  <ul>
+    <li><strong>Local truncation error</strong> and <strong>global error</strong> at a fixed final time \(T\).</li>
+    <li><strong>Order of accuracy</strong> \(p\), meaning global error \(O(h^p)\) as \(h\to0\).</li>
+    <li><strong>Stability</strong> in the sense of Dahlquist (e.g. A-stability, L-stability) for linear test problems.</li>
+  </ul>
+
+  <p>
+    For many applications this is sufficient. However, in problems such as:
+  </p>
+
+  <ul>
+    <li>Hamiltonian mechanics (celestial mechanics, molecular dynamics),</li>
+    <li>charged particle dynamics in electromagnetic fields,</li>
+    <li>wave propagation and long-time asymptotics,</li>
+  </ul>
+
+  <p>
+    the <em>long-time qualitative behaviour</em> is crucial: boundedness of energy,
+    correct qualitative phase portraits, existence of quasi-periodic tori, etc.
+    Standard high-order methods can reproduce short-time trajectories very
+    accurately yet fail dramatically over long times by slowly but steadily
+    destroying invariants.
+  </p>
+
+  <p>
+    Geometric numerical analysis shifts the emphasis:
+  </p>
+
+  <ul>
+    <li>
+      <strong>Preserve structure exactly, accept small controlled distortion
+      elsewhere.</strong> For instance, symplectic integrators for Hamiltonian systems
+      do not exactly conserve energy, but they nearly do so over exponentially long
+      times by following the flow of a <em>modified</em> Hamiltonian; see backward error
+      analysis in later chapters and in <span class="citation">[HLW06, Ch. IX]</span>.  [oai_citation:1‡Université Paris 13](https://www.math.univ-paris13.fr/~cuvelier/docs/Enseignements/Energetique/AnaNumII/12-13/TP1/G3/Geometric_Numerical_Integration_-_Hairer_Chap1.pdf?utm_source=chatgpt.com)
+    </li>
+    <li>
+      <strong>View methods as geometric maps.</strong> Numerical integrators are treated as
+      diffeomorphisms \(\Phi_h\) on phase space with specific properties
+      (symplectic, volume-preserving, reversible, etc.).
+    </li>
+    <li>
+      <strong>Focus on long-time dynamics.</strong> Instead of asking “What is the error
+      at \(T\)?”, we ask “How does the numerical phase portrait compare with the
+      true one for large \(n\)?”.
+    </li>
+  </ul>
+
+  <p>
+    The outcome is a theory that explains why relatively low-order geometric
+    methods can dramatically outperform higher-order non-geometric methods in
+    long-time simulations of structured systems.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-1-3">1.1.3 Example: Harmonic Oscillator and Energy Drift</h3>
+
+  <p>
+    A canonical example is the one-dimensional harmonic oscillator:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{q} = p, \qquad \dot{p} = -q,
+    \]
+  </p>
+
+  <p>
+    with Hamiltonian
+  </p>
+
+  <p class="math">
+    \[
+      H(q,p) = \frac{1}{2}(p^2 + q^2).
+    \]
+  </p>
+
+  <p>
+    The exact flow preserves energy exactly: \(H(q(t),p(t)) = H(q_0,p_0)\) for all \(t\).
+  </p>
+
+  <h4>Explicit Euler</h4>
+
+  <p>
+    The explicit Euler method for this system is
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+        q_{n+1} &= q_n + h p_n,\\
+        p_{n+1} &= p_n - h q_n.
+      \end{aligned}
+    \]
+  </p>
+
+  <p>
+    This map is <em>not</em> symplectic, not volume-preserving, and the discrete energy
+    \(H(q_n,p_n)\) typically grows (for small \(h\)), causing a spiralling-out
+    numerical trajectory in phase space.
+  </p>
+
+  <h4>Symplectic Euler</h4>
+
+  <p>
+    One variant of the symplectic Euler method (sometimes called “implicit in \(p\)”)
+    is
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+        p_{n+1} &= p_n - h q_n,\\
+        q_{n+1} &= q_n + h p_{n+1}.
+      \end{aligned}
+    \]
+  </p>
+
+  <p>
+    This method is <em>symplectic</em>: its Jacobian matrix \(D\Phi_h(q,p)\) satisfies
+    \(J^\top \Omega J = \Omega\) with the standard symplectic matrix
+    <span class="math">\(\Omega = \begin{pmatrix}0 & 1\\ -1 & 0\end{pmatrix}\)</span>.
+    Although it does not conserve the original energy exactly,
+    backward error analysis shows that it nearly conserves a nearby (modified)
+    Hamiltonian over very long times.
+  </p>
+
+  <p>
+    Qualitatively, instead of a spiralling trajectory, we obtain a nearly closed
+    invariant curve, and the numerical energy oscillates within a small band.
+  </p>
+
+  <figure id="fig-1-1" style="text-align:center;">
+    <canvas id="oscillatorCanvas" width="600" height="260"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 1.1</strong> – Numerical energy \(H(q_n,p_n)\) vs time for the
+      harmonic oscillator with step-size \(h=0.1\), comparing explicit Euler
+      (growing energy) and symplectic Euler (bounded oscillatory energy).
+    </figcaption>
+  </figure>
+
+  <script>
+    // Simple demo: energy of harmonic oscillator with Euler vs symplectic Euler.
+    (function() {
+      const canvas = document.getElementById('oscillatorCanvas');
+      if (!canvas || !canvas.getContext) return;
+      const ctx = canvas.getContext('2d');
+
+      // Parameters
+      const h = 0.1;
+      const steps = 400;
+      const q0 = 1.0, p0 = 0.0;
+
+      // Storage
+      const energyEuler = [];
+      const energySymp = [];
+      const tvals = [];
+
+      // Explicit Euler
+      let q = q0, p = p0;
+      for (let n = 0; n <= steps; ++n) {
+        const t = n * h;
+        tvals.push(t);
+        const H = 0.5 * (p*p + q*q);
+        energyEuler.push(H);
+        // Step
+        const q_new = q + h * p;
+        const p_new = p - h * q;
+        q = q_new; p = p_new;
+      }
+
+      // Symplectic Euler (p first, then q)
+      q = q0; p = p0;
+      for (let n = 0; n <= steps; ++n) {
+        const H = 0.5 * (p*p + q*q);
+        energySymp.push(H);
+        // Step
+        const p_new = p - h * q;
+        const q_new = q + h * p_new;
+        q = q_new; p = p_new;
+      }
+
+      // Determine ranges
+      const Eall = energyEuler.concat(energySymp);
+      const Emin = Math.min.apply(null, Eall);
+      const Emax = Math.max.apply(null, Eall);
+
+      // Padding
+      const padLeft = 40, padRight = 10, padTop = 10, padBottom = 30;
+      const w = canvas.width, hC = canvas.height;
+
+      // Helper: convert (t,E) to canvas coords
+      function xScale(t) {
+        const tmin = 0, tmax = tvals[tvals.length - 1];
+        return padLeft + (t - tmin) * (w - padLeft - padRight) / (tmax - tmin);
+      }
+      function yScale(E) {
+        return hC - padBottom - (E - Emin) * (hC - padTop - padBottom) / (Emax - Emin);
+      }
+
+      // Clear
+      ctx.clearRect(0, 0, w, hC);
+      ctx.font = "12px sans-serif";
+
+      // Axes
+      ctx.beginPath();
+      ctx.moveTo(padLeft, padTop);
+      ctx.lineTo(padLeft, hC - padBottom);
+      ctx.lineTo(w - padRight, hC - padBottom);
+      ctx.strokeStyle = "#000";
+      ctx.stroke();
+
+      // Labels
+      ctx.fillText("t", w - padRight - 10, hC - padBottom + 20);
+      ctx.fillText("H", padLeft - 20, padTop + 10);
+
+      // Plot Euler (red-ish)
+      ctx.beginPath();
+      for (let n = 0; n < tvals.length; ++n) {
+        const x = xScale(tvals[n]);
+        const y = yScale(energyEuler[n]);
+        if (n === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = "#c00";
+      ctx.stroke();
+
+      // Plot Symplectic Euler (blue-ish)
+      ctx.beginPath();
+      for (let n = 0; n < tvals.length; ++n) {
+        const x = xScale(tvals[n]);
+        const y = yScale(energySymp[n]);
+        if (n === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = "#006";
+      ctx.stroke();
+
+      // Legend
+      ctx.fillStyle = "#c00";
+      ctx.fillRect(padLeft + 10, padTop + 5, 10, 3);
+      ctx.fillStyle = "#000";
+      ctx.fillText("Explicit Euler", padLeft + 25, padTop + 10);
+
+      ctx.fillStyle = "#006";
+      ctx.fillRect(padLeft + 10, padTop + 20, 10, 3);
+      ctx.fillStyle = "#000";
+      ctx.fillText("Symplectic Euler", padLeft + 25, padTop + 25);
+    })();
+  </script>
+
+  <p class="task">
+    Task marker: in later sections we can formalize the proof of symplecticity for
+    symplectic Euler and perform a rigorous backward error analysis for the oscillator.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-1-4">1.1.4 Geometric Structures and Corresponding Integrators</h3>
+
+  <p>
+    Many important classes of differential equations are characterized by particular
+    geometric structures. Table 1.1 summarizes a few, along with typical geometric
+    integrator families designed for them.
+  </p>
+
+  <figure id="tab-1-1">
+    <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse; width:100%;">
+      <thead>
+        <tr>
+          <th>Class of system</th>
+          <th>Geometric structure preserved by flow</th>
+          <th>Typical geometric integrators</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Hamiltonian ODEs</td>
+          <td>Symplectic form, volume, (approx.) Hamiltonian</td>
+          <td>Symplectic Runge–Kutta, splitting/composition methods, variational integrators</td>
+        </tr>
+        <tr>
+          <td>Reversible systems</td>
+          <td>Reversing symmetry \(R\) with \(R^2 = \mathrm{id}\)</td>
+          <td>Symmetric compositions, time-reversible integrators</td>
+        </tr>
+        <tr>
+          <td>ODEs on manifolds / Lie groups</td>
+          <td>Manifold constraint, group structure</td>
+          <td>Lie-group integrators (RKMK, Crouch–Grossman, Munthe-Kaas methods)</td>
+        </tr>
+        <tr>
+          <td>Gradient systems</td>
+          <td>Lyapunov functional decreasing along flow</td>
+          <td>Energy-diminishing / contractive methods, discrete gradient methods</td>
+        </tr>
+        <tr>
+          <td>Volume-preserving systems</td>
+          <td>Volume form</td>
+          <td>Volume-preserving integrators (e.g. splitting methods on divergence-free fields)</td>
+        </tr>
+        <tr>
+          <td>Highly oscillatory Hamiltonian systems</td>
+          <td>Adiabatic invariants, actions</td>
+          <td>Modulated Fourier integrators, tailored splitting schemes</td>
+        </tr>
+      </tbody>
+    </table>
+    <figcaption>
+      <strong>Table 1.1</strong> – Examples of geometric structures preserved by exact flows
+      and corresponding families of geometric integrators. See <span class="citation">[HLW06, BC26]</span>
+      for details.  [oai_citation:2‡Université Paris 13](https://www.math.univ-paris13.fr/~cuvelier/docs/Enseignements/Energetique/AnaNumII/12-13/TP1/G3/Geometric_Numerical_Integration_-_Hairer_Chap1.pdf?utm_source=chatgpt.com)
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <h3 id="sec-1-1-5">1.1.5 Where This Book Sits in the Literature</h3>
+
+  <p>
+    The modern theory of geometric numerical integration is primarily developed in:
+  </p>
+
+  <ul>
+    <li>
+      E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration: Structure-Preserving Algorithms for Ordinary Differential Equations</em>,
+      2nd ed., Springer, 2006. <span class="citation">[HLW06]</span>  [oai_citation:3‡Google Books](https://books.google.com/books/about/Geometric_Numerical_Integration.html?id=T1TaNRLmZv8C&utm_source=chatgpt.com)
+    </li>
+    <li>
+      S. Blanes, F. Casas,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>, 2nd ed.,
+      Chapman &amp; Hall/CRC, 2026. <span class="citation">[BC26]</span>  [oai_citation:4‡Taylor & Francis](https://www.taylorfrancis.com/books/mono/10.1201/9781003527626/concise-introduction-geometric-numerical-integration-sergio-blanes-fernando-casas?utm_source=chatgpt.com)
+    </li>
+  </ul>
+
+  <p>
+    The present document follows the structure of <span class="citation">[BC26]</span> and aims to
+    provide a more expansive, first-principles exposition that:
+  </p>
+
+  <ol>
+    <li>Builds up the geometric language (symplectic forms, flows on manifolds, Lie groups).</li>
+    <li>Explains how standard numerical methods can be viewed as maps on phase space.</li>
+    <li>Shows how structure-preserving maps are constructed (splitting, composition, variational, Lie-group, exponential and Magnus methods).</li>
+    <li>Introduces key tools such as backward error analysis and B-series.</li>
+    <li>Connects to new topics emphasized in the 2nd edition: non-autonomous systems, PDEs, Hamiltonian Monte Carlo, and quantum computing.  [oai_citation:5‡Taylor & Francis](https://www.taylorfrancis.com/books/mono/10.1201/9781003527626/concise-introduction-geometric-numerical-integration-sergio-blanes-fernando-casas?utm_source=chatgpt.com)</li>
+  </ol>
+
+  <p class="task">
+    Task marker: Section 1.2 will formalize flows, invariants, and symmetries using
+    differential geometric tools (Lie derivatives, pullbacks, pushforwards), and
+    will set up the precise definition of symplectic and other geometric structures.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-1-6">1.1.6 References for Section 1.1</h3>
+
+  <ol>
+    <li id="ref-HLW06">
+      <strong>[HLW06]</strong> E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration: Structure-Preserving Algorithms for Ordinary Differential Equations</em>,
+      2nd ed., Springer, 2006.  [oai_citation:6‡Google Books](https://books.google.com/books/about/Geometric_Numerical_Integration.html?id=T1TaNRLmZv8C&utm_source=chatgpt.com)
+    </li>
+    <li id="ref-BC26">
+      <strong>[BC26]</strong> S. Blanes, F. Casas,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>, 2nd ed.,
+      Chapman &amp; Hall/CRC, 2026.  [oai_citation:7‡Taylor & Francis](https://www.taylorfrancis.com/books/mono/10.1201/9781003527626/concise-introduction-geometric-numerical-integration-sergio-blanes-fernando-casas?utm_source=chatgpt.com)
+    </li>
+    <li id="ref-HairerNotes">
+      <strong>[Hai99]</strong> E. Hairer,
+      “Numerical Geometric Integration,”
+      <em>Lecture notes</em>, 1998–1999 (available online).  [oai_citation:8‡Math McGill](https://www.math.mcgill.ca/gantumur/docs/down/Hairer9899.pdf?utm_source=chatgpt.com)
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-1-2">
+  <h2>1.2 Fundamental Objects in Differential Equations</h2>
+
+  <p>
+    In Section 1.1, we introduced the notion of a <em>flow</em> of an ODE and motivated
+    the idea of preserving geometric properties in numerical integration. We now
+    formalize these concepts using basic differential geometric language. Our goal
+    is to define:
+  </p>
+
+  <ol>
+    <li>Flows and their infinitesimal generators (vector fields),</li>
+    <li>Invariants and first integrals,</li>
+    <li>Symmetries and reversible systems,</li>
+    <li>Geometric structures (symplectic, volume-preserving, etc.) that will be central for geometric integrators.</li>
+  </ol>
+
+  <p>
+    Throughout, we work primarily on \( \mathbb{R}^d \) for simplicity, but the
+    concepts extend naturally to smooth manifolds; see e.g. <span class="citation">[AM78]</span>.  
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-2-1">1.2.1 Vector Fields and Flows</h3>
+
+  <p>
+    Let \(M\) be a smooth manifold (for most of this section you may take \(M =
+    \mathbb{R}^d\)). A <strong>vector field</strong> on \(M\) is a smooth assignment
+    that to each point \(x \in M\) associates a tangent vector \(f(x) \in T_x M\).
+    We write:
+  </p>
+
+  <p class="math">
+    \[
+      f : M \to TM, \qquad x \mapsto f(x) \in T_x M,
+    \]
+  </p>
+
+  <p>
+    and in a global coordinate chart on \(\mathbb{R}^d\) we simply view
+    \(f(x)\) as a function \(f : \mathbb{R}^d \to \mathbb{R}^d\).
+  </p>
+
+  <h4>Integral curves and flows</h4>
+
+  <p>
+    A smooth curve \(\gamma: I \to M\) is called an <strong>integral curve</strong> of a
+    vector field \(f\) if it satisfies the ODE:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{\gamma}(t) = f(\gamma(t)), \qquad t \in I \subset \mathbb{R}.
+    \]
+  </p>
+
+  <p>
+    Under standard existence and uniqueness conditions (e.g. \(f\) locally Lipschitz),
+    for every point \(x \in M\) there is a maximal interval \(I_x\) and a unique integral
+    curve \(\gamma_x : I_x \to M\) with \(\gamma_x(0) = x\). The <strong>flow</strong> of
+    \(f\) is then the mapping
+  </p>
+
+  <p class="math">
+    \[
+      \varphi : D \subset \mathbb{R} \times M \to M, \qquad
+      \varphi(t,x) := \gamma_x(t),
+    \]
+  </p>
+
+  <p>
+    defined on an open domain \(D\) such that \((0,x) \in D\) for all \(x\).
+    For each fixed \(t\) such that \(\{t\} \times M \subset D\), we write
+    \(\varphi^t : M \to M\), \(\varphi^t(x) = \varphi(t,x)\).
+  </p>
+
+  <p>
+    The flow satisfies the <strong>group property</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      \varphi^0 = \mathrm{id}_M, \qquad
+      \varphi^{t+s} = \varphi^t \circ \varphi^s,
+    \]
+  </p>
+
+  <p>
+    whenever the compositions are defined. Conversely, a one-parameter group
+    of diffeomorphisms \(\{\varphi^t\}_{t}\) with \(\varphi^0 = \mathrm{id}\)
+    arises from a unique (time-independent) vector field \(f\) given by the
+    <strong>infinitesimal generator</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      f(x) = \left.\frac{d}{dt}\right|_{t=0} \varphi^t(x).
+    \]
+  </p>
+
+  <h4>Autonomous vs non-autonomous systems</h4>
+
+  <p>
+    An <strong>autonomous</strong> ODE on \(M\) has the form
+  </p>
+
+  <p class="math">
+    \[
+      \dot{y} = f(y),
+    \]
+  </p>
+
+  <p>
+    with \(f\) independent of time. Its flow satisfies the group property above.
+    By contrast, a <strong>non-autonomous</strong> ODE has the form
+  </p>
+
+  <p class="math">
+    \[
+      \dot{y} = f(t, y),
+    \]
+  </p>
+
+  <p>
+    and its evolution operator \(\Phi^{t,s}\) mapping \(y(s)\) to \(y(t)\) generally
+    satisfies a two-parameter semigroup property:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi^{t,s} \circ \Phi^{s,r} = \Phi^{t,r}, \qquad \Phi^{s,s} = \mathrm{id}.
+    \]
+  </p>
+
+  <p>
+    A common trick, central in geometric integration for non-autonomous systems,
+    is to convert the system into an autonomous one on an extended phase space
+    \(M \times \mathbb{R}\); we return to this in Section 7.
+  </p>
+
+  <figure id="fig-1-2">
+    <svg id="flowFieldSVG" width="520" height="260" style="border:1px solid #ccc;">
+      <!-- The JS below will populate arrows and trajectories -->
+      Sorry, your browser does not support inline SVG.
+    </svg>
+    <figcaption>
+      <strong>Figure 1.2</strong> – Vector field and approximate flow lines for a planar
+      system. The arrows depict the vector field \(f(x)\), and the curves show
+      integral curves (numerically approximated). An autonomous system corresponds
+      to time-invariant arrows; non-autonomous systems would have time-dependent
+      vector fields. This figure is generated interactively with JavaScript.
+    </figcaption>
+  </figure>
+
+  <script>
+    // Simple SVG visualization of a 2D vector field and its flows.
+    (function() {
+      const svg = document.getElementById("flowFieldSVG");
+      if (!svg) return;
+
+      const width = svg.viewBox.baseVal.width || svg.clientWidth || 520;
+      const height = svg.viewBox.baseVal.height || svg.clientHeight || 260;
+
+      // Coordinate ranges in phase space
+      const xmin = -2.0, xmax = 2.0;
+      const ymin = -1.0, ymax = 3.0;
+
+      function xToSvg(x) {
+        return (x - xmin) / (xmax - xmin) * width;
+      }
+      function yToSvg(y) {
+        return height - (y - ymin) / (ymax - ymin) * height;
+      }
+
+      // Example vector field: a simple nonlinear system
+      //   q' = p
+      //   p' = -q - 0.2 q^3
+      function f(q, p) {
+        return { dq: p, dp: -q - 0.2*q*q*q };
+      }
+
+      // Draw vector field arrows on a coarse grid
+      const gridQ = 11, gridP = 11;
+      for (let i = 0; i < gridQ; ++i) {
+        for (let j = 0; j < gridP; ++j) {
+          const q = xmin + (xmax - xmin) * i / (gridQ - 1);
+          const p = ymin + (ymax - ymin) * j / (gridP - 1);
+          const v = f(q, p);
+          const norm = Math.sqrt(v.dq*v.dq + v.dp*v.dp) || 1e-6;
+          const scale = 0.2; // arrow length scale in phase coords
+          const dq = (v.dq / norm) * scale;
+          const dp = (v.dp / norm) * scale;
+
+          const x1 = xToSvg(q - 0.5*dq);
+          const y1 = yToSvg(p - 0.5*dp);
+          const x2 = xToSvg(q + 0.5*dq);
+          const y2 = yToSvg(p + 0.5*dp);
+
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("x1", x1);
+          line.setAttribute("y1", y1);
+          line.setAttribute("x2", x2);
+          line.setAttribute("y2", y2);
+          line.setAttribute("stroke", "#999");
+          line.setAttribute("stroke-width", "1");
+          svg.appendChild(line);
+        }
+      }
+
+      // Draw several integral curves via a simple numerical integrator (RK2)
+      const initialConditions = [
+        {q: -1.5, p: 0.0},
+        {q: 0.0,  p: 1.0},
+        {q: 1.2,  p: 1.0},
+        {q: -0.5, p: 2.0}
+      ];
+
+      const h = 0.05, steps = 200;
+      initialConditions.forEach((ic) => {
+        let q = ic.q, p = ic.p;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        let d = "";
+        for (let n = 0; n < steps; ++n) {
+          const x = xToSvg(q);
+          const y = yToSvg(p);
+          d += (n === 0 ? "M " : " L ") + x + " " + y;
+
+          // RK2 (midpoint) step
+          const k1 = f(q, p);
+          const qMid = q + 0.5*h*k1.dq;
+          const pMid = p + 0.5*h*k1.dp;
+          const k2 = f(qMid, pMid);
+          q += h * k2.dq;
+          p += h * k2.dp;
+        }
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "#006");
+        path.setAttribute("stroke-width", "1.5");
+        svg.appendChild(path);
+      });
+    })();
+  </script>
+
+  <p class="task">
+    Task marker: later sections will replace the ad-hoc RK2 integrator used for plotting
+    with structure-preserving methods and compare phase portraits.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-2-2">1.2.2 Invariants and First Integrals</h3>
+
+  <p>
+    An important qualitative feature of many dynamical systems is the existence of
+    quantities that do not change along solutions.
+  </p>
+
+  <p><strong>Definition 1.1 (First integral).</strong>
+    Let \(f\) be a vector field on \(M\) with flow \(\varphi^t\). A smooth function
+    \(I : M \to \mathbb{R}\) is called a <em>first integral</em> or <em>invariant</em> if
+  </p>
+
+  <p class="math">
+    \[
+      I(\varphi^t(x)) = I(x) \quad \text{for all } x \in M \text{ and all } t \text{ in the domain of the flow}.
+    \]
+  </p>
+
+  <p>
+    Equivalently, the derivative of \(I\) along integral curves vanishes:
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt} I(\gamma(t)) = 0
+      \quad \text{whenever} \quad \dot{\gamma}(t) = f(\gamma(t)).
+    \]
+  </p>
+
+  <p>
+    In local coordinates, this is expressed using the gradient:
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt} I(y(t))
+      = \nabla I(y(t)) \cdot \dot{y}(t)
+      = \nabla I(y(t)) \cdot f(y(t)) = 0.
+    \]
+  </p>
+
+  <p>
+    The differential-geometric formulation uses the <em>Lie derivative</em> of a function
+    with respect to a vector field:
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{L}_f I = f[I] := dI(f) = \nabla I \cdot f.
+    \]
+  </p>
+
+  <p>
+    Then \(I\) is a first integral if and only if
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{L}_f I = 0.
+    \]
+  </p>
+
+  <h4>Examples</h4>
+
+  <ol>
+    <li>
+      <strong>Energy of the harmonic oscillator.</strong>
+      For the system \(\dot{q} = p\), \(\dot{p} = -q\), the Hamiltonian
+      \(H(q,p) = \frac{1}{2}(p^2 + q^2)\) satisfies
+      \(\nabla H = (q, p)\), and
+      \(\nabla H \cdot (p, -q) = q p + p(-q) = 0\), so \(H\) is invariant.
+    </li>
+    <li>
+      <strong>Angular momentum in central forces.</strong>
+      For a particle in \(\mathbb{R}^3\) with \(\dot{x} = v\), \(\dot{v} = F(x)\)
+      and \(F(x) = f(|x|) x\) central, the angular momentum
+      \(L = x \times v\) is invariant. This is linked to rotational symmetry
+      and Noether’s theorem.
+    </li>
+  </ol>
+
+  <p>
+    For geometric integrators, the question is: <em>can we construct numerical
+    methods that preserve such invariants exactly?</em> For quadratic invariants,
+    special Runge–Kutta and projection methods can achieve this; see
+    <span class="citation">[HLW06, Ch. 3]</span>.  
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-2-3">1.2.3 Symmetries and Reversibility</h3>
+
+  <p>
+    The behaviour of a dynamical system is often constrained by its symmetries.
+    These symmetries are crucial in geometric integration because numerical methods
+    can be designed to respect them.
+  </p>
+
+  <h4>Symmetry under a diffeomorphism</h4>
+
+  <p><strong>Definition 1.2 (Symmetry of a vector field).</strong>
+    Let \(G\) be a Lie group acting smoothly on \(M\) via \(\Phi : G \times M \to M\),
+    \((g,x) \mapsto \Phi(g,x)\).
+    An element \(g \in G\) is a <em>symmetry</em> of the vector field \(f\) if
+  </p>
+
+  <p class="math">
+    \[
+      T_x \Phi(g, \cdot) \, f(x) = f(\Phi(g,x))
+      \qquad \text{for all } x \in M,
+    \]
+  </p>
+
+  <p>
+    i.e. the pushforward of \(f\) under the group action equals \(f\) at the
+    transformed point. This implies that the flow commutes with the group action:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi(g,\varphi^t(x)) = \varphi^t(\Phi(g,x)).
+    \]
+  </p>
+
+  <p>
+    Symmetries give rise to conserved quantities via Noether’s theorem when the
+    system derives from a variational principle; see <span class="citation">[AM78]</span>.
+  </p>
+
+  <h4>Reversible systems</h4>
+
+  <p>
+    A particularly important type of symmetry is <em>time-reversal</em>.
+  </p>
+
+  <p><strong>Definition 1.3 (Reversible system).</strong>
+    Let \(R : M \to M\) be an involution, i.e. \(R^2 = \mathrm{id}_M\).
+    An autonomous system \(\dot{y} = f(y)\) is called <em>reversible</em> with respect
+    to \(R\) if
+  </p>
+
+  <p class="math">
+    \[
+      f(Ry) = - T_y R \, f(y).
+    \]
+  </p>
+
+  <p>
+    This implies the <strong>reversing symmetry</strong> relation for the flow:
+  </p>
+
+  <p class="math">
+    \[
+      R \circ \varphi^t \circ R = \varphi^{-t}.
+    \]
+  </p>
+
+  <p>
+    For example, Hamiltonian systems with standard symplectic structure are reversible
+    under the involution \(R(q,p) = (q,-p)\), when the Hamiltonian satisfies appropriate
+    conditions. Reversibility implies the existence of symmetric orbits and constrains
+    the long-time behaviour.
+  </p>
+
+  <p>
+    Geometric integrators can be constructed to be <em>self-adjoint</em> (time-symmetric),
+    which is the discrete analogue of reversibility and plays a key role in achieving
+    good long-time behaviour; see <span class="citation">[HLW06, Ch. 2, 3]</span>.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-2-4">1.2.4 Pullbacks, Pushforwards, and Lie Derivatives</h3>
+
+  <p>
+    To formalize the preservation of geometric quantities by flows (and later by
+    numerical methods), we briefly recall the notions of pullback, pushforward, and
+    Lie derivative.
+  </p>
+
+  <h4>Pushforward of a vector field</h4>
+
+  <p>
+    Let \(\psi : M \to N\) be a smooth map between manifolds. Its <strong>differential</strong>
+    at \(x\) is the linear map
+  </p>
+
+  <p class="math">
+    \[
+      T_x \psi : T_x M \to T_{\psi(x)} N,
+    \]
+  </p>
+
+  <p>
+    called the <em>pushforward</em>. If \(f\) is a vector field on \(M\), we define the
+    pushforward vector field \(\psi_* f\) on \(\psi(M)\) (when \(\psi\) is a diffeomorphism)
+    by
+  </p>
+
+  <p class="math">
+    \[
+      (\psi_* f)(\psi(x)) = T_x \psi \, f(x).
+    \]
+  </p>
+
+  <h4>Pullback of functions and forms</h4>
+
+  <p>
+    For a smooth function \(g: N \to \mathbb{R}\), the <strong>pullback</strong> by \(\psi\)
+    is simply composition:
+  </p>
+
+  <p class="math">
+    \[
+      (\psi^* g)(x) := g(\psi(x)).
+    \]
+  </p>
+
+  <p>
+    More generally, if \(\alpha\) is a differential 1-form (or higher-rank form) on \(N\),
+    the pullback \(\psi^*\alpha\) is a form on \(M\) defined so that it “undoes” the
+    effect of the pushforward; see <span class="citation">[AM78]</span> for the standard construction.
+  </p>
+
+  <h4>Lie derivative of a function and of a form</h4>
+
+  <p>
+    Let \(f\) be a vector field with flow \(\varphi^t\). For a smooth function
+    \(I : M \to \mathbb{R}\), the Lie derivative of \(I\) along \(f\) is defined by
+  </p>
+
+  <p class="math">
+    \[
+      (\mathcal{L}_f I)(x)
+      = \left.\frac{d}{dt}\right|_{t=0} I(\varphi^t(x))
+      = \nabla I(x)\cdot f(x).
+    \]
+  </p>
+
+  <p>
+    For a differential form \(\alpha\), the Lie derivative is defined by
+  </p>
+
+  <p class="math">
+    \[
+      (\mathcal{L}_f \alpha)_x
+      = \left.\frac{d}{dt}\right|_{t=0} (\varphi^t)^* \alpha_{\varphi^t(x)}.
+    \]
+  </p>
+
+  <p>
+    A form \(\alpha\) is preserved by the flow if and only if
+    \((\mathcal{L}_f \alpha) = 0\), which in turn is equivalent to
+    \((\varphi^t)^*\alpha = \alpha\) for all \(t\).
+  </p>
+
+  <p>
+    These notions are fundamental in defining symplectic and volume-preserving
+    structures and in proving their invariance under flows and numerical methods.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-2-5">1.2.5 Symplectic and Volume-Preserving Flows</h3>
+
+  <p>
+    Two particularly important geometric structures in GNI are:
+  </p>
+
+  <ol>
+    <li>Symplectic structures (for Hamiltonian systems),</li>
+    <li>Volume forms (for divergence-free or Hamiltonian flows).</li>
+  </ol>
+
+  <h4>Symplectic forms and Hamiltonian vector fields</h4>
+
+  <p>
+    A <strong>symplectic form</strong> on a manifold \(M\) is a closed, nondegenerate
+    2-form \(\omega\), that is:
+  </p>
+
+  <ul>
+    <li>\(\omega\) is a smooth bilinear, skew-symmetric form on each tangent space;</li>
+    <li>\(d\omega = 0\) (closed);</li>
+    <li>For each \(x\), the map \(T_xM \to T_x^*M\), \(v \mapsto \omega_x(v, \cdot)\), is an isomorphism (nondegenerate).</li>
+  </ul>
+
+  <p>
+    On \(M = \mathbb{R}^{2m}\) with coordinates \(z=(q,p)\), the standard symplectic
+    form is
+  </p>
+
+  <p class="math">
+    \[
+      \omega = \sum_{i=1}^m dq_i \wedge dp_i,
+    \]
+  </p>
+
+  <p>
+    or in matrix form, \(\omega(u,v) = u^\top \Omega v\) with the canonical symplectic
+    matrix \(\Omega = \begin{pmatrix} 0 & I \\ -I & 0\end{pmatrix}\).
+  </p>
+
+  <p>
+    Given a smooth function \(H : M \to \mathbb{R}\) called the <strong>Hamiltonian</strong>,
+    the associated <strong>Hamiltonian vector field</strong> \(X_H\) is uniquely defined
+    by
+  </p>
+
+  <p class="math">
+    \[
+      i_{X_H}\omega = dH,
+    \]
+  </p>
+
+  <p>
+    i.e. \(\omega(X_H, \cdot) = dH\). In canonical coordinates this yields Hamilton’s
+    equations:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{q} = \frac{\partial H}{\partial p}, \qquad
+      \dot{p} = - \frac{\partial H}{\partial q}.
+    \]
+  </p>
+
+  <p>
+    The flow \(\varphi^t\) of a Hamiltonian vector field is <em>symplectic</em>,
+    meaning
+  </p>
+
+  <p class="math">
+    \[
+      (\varphi^t)^* \omega = \omega,
+    \]
+  </p>
+
+  <p>
+    or in coordinates
+    \(\,(D\varphi^t(z))^\top \Omega\, D\varphi^t(z) = \Omega\).
+    This symplecticity implies conservation of phase-space volume (Liouville’s
+    theorem) and many other qualitative properties; see <span class="citation">[HLW06, Ch. 1]</span>.
+  </p>
+
+  <h4>Volume-preserving flows</h4>
+
+  <p>
+    On \(M = \mathbb{R}^d\), the standard volume form is
+    \(\mathrm{d}V = dx_1 \wedge \cdots \wedge dx_d\). A diffeomorphism
+    \(\psi : M \to M\) is volume-preserving if
+  </p>
+
+  <p class="math">
+    \[
+      \psi^*(\mathrm{d}V) = \mathrm{d}V
+      \quad \Longleftrightarrow \quad
+      \det D\psi(x) = 1 \quad \forall x.
+    \]
+  </p>
+
+  <p>
+    For a vector field \(f\), the Lie derivative condition
+    \(\mathcal{L}_f(\mathrm{d}V) = 0\) is equivalent to \(\nabla \cdot f = 0\):
+    a <strong>divergence-free</strong> vector field generates a volume-preserving flow.
+  </p>
+
+  <p>
+    Hamiltonian vector fields are divergence-free with respect to the canonical
+    volume form, hence Hamiltonian flows are volume-preserving. There exist
+    other classes of volume-preserving flows that are not symplectic, and GNI
+    has developed specialized integrators for them; see <span class="citation">[HLW06, Ch. VI]</span>.
+  </p>
+
+  <figure id="tab-1-2">
+    <table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse; width:100%;">
+      <thead>
+        <tr>
+          <th>Structure</th>
+          <th>Defining property</th>
+          <th>Flow condition</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Symplectic</td>
+          <td>Closed, nondegenerate 2-form \(\omega\)</td>
+          <td>\((\varphi^t)^*\omega = \omega\)</td>
+        </tr>
+        <tr>
+          <td>Volume-preserving</td>
+          <td>Volume form \(\mathrm{d}V\)</td>
+          <td>\((\varphi^t)^*\mathrm{d}V = \mathrm{d}V\)</td>
+        </tr>
+        <tr>
+          <td>Reversible</td>
+          <td>Involution \(R : M \to M\)</td>
+          <td>\(R \circ \varphi^t \circ R = \varphi^{-t}\)</td>
+        </tr>
+        <tr>
+          <td>Invariant function</td>
+          <td>First integral \(I : M \to \mathbb{R}\)</td>
+          <td>\(I \circ \varphi^t = I\)</td>
+        </tr>
+      </tbody>
+    </table>
+    <figcaption>
+      <strong>Table 1.2</strong> – Examples of geometric structures viewed as preserved
+      objects under a flow \(\varphi^t\).
+    </figcaption>
+  </figure>
+
+  <p class="task">
+    Task marker: later chapters will introduce symplectic integrators whose discrete maps
+    \(\Phi_h\) satisfy the same algebraic symplectic condition, and volume-preserving
+    schemes with \(\det D\Phi_h = 1\).
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-2-6">1.2.6 Summary and Outlook</h3>
+
+  <p>
+    In this section we have:
+  </p>
+
+  <ul>
+    <li>Defined vector fields and flows on manifolds,</li>
+    <li>Formalized invariants as functions with zero Lie derivative,</li>
+    <li>Introduced symmetries, reversibility, and the role of group actions,</li>
+    <li>Used pullbacks, pushforwards, and Lie derivatives to express structure preservation,</li>
+    <li>Characterized symplectic and volume-preserving flows as central geometric structures.</li>
+  </ul>
+
+  <p>
+    Geometric numerical integrators are, in essence, numerical maps \(\Phi_h\) that
+    attempt to mimic these preservation properties at the discrete level. In the
+    next sections, we focus specifically on Hamiltonian systems and symplectic
+    geometry (Chapter 2) and then on symplectic integrators (Chapter 3), following
+    and expanding the treatment in <span class="citation">[BC26, HLW06]</span>.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-2-7">1.2.7 References for Section 1.2</h3>
+
+  <ol>
+    <li id="ref-AM78">
+      <strong>[AM78]</strong> R. Abraham, J.E. Marsden,
+      <em>Foundations of Mechanics</em>, 2nd ed., Addison–Wesley, 1978.
+      (Standard reference for differential geometry, symplectic forms, and Hamiltonian systems.)
+    </li>
+    <li id="ref-HLW06">
+      <strong>[HLW06]</strong> E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration: Structure-Preserving Algorithms for Ordinary Differential Equations</em>,
+      2nd ed., Springer, 2006. (See especially Chapters I–III for flows, invariants, and symplecticity.)
+    </li>
+    <li id="ref-BC26">
+      <strong>[BC26]</strong> S. Blanes, F. Casas,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>, 2nd ed.,
+      Chapman &amp; Hall/CRC, 2026. (Introductory material on geometric structures and integrators.)
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-1-3">
+  <h2>1.3 The Geometry of Flows</h2>
+
+  <p>
+    The purpose of this section is to explain how flows of ODEs can be understood
+    geometrically: as one-parameter groups of diffeomorphisms generated by vector
+    fields, acting on functions, forms, and structures on phase space.
+  </p>
+
+  <p>
+    This viewpoint is essential in geometric numerical integration because it allows us
+    to interpret a numerical method not merely as a recursion formula, but as a
+    <em>discrete flow map</em> whose geometric properties can be studied, compared,
+    and preserved. Our objective is to formalize the following ideas:
+  </p>
+
+  <ol>
+    <li>The flow as a one-parameter group of diffeomorphisms,</li>
+    <li>The infinitesimal generator as a derivation (Lie derivative),</li>
+    <li>The exponential map linking vector fields and flows,</li>
+    <li>The Baker–Campbell–Hausdorff (BCH) structure underlying splitting methods,</li>
+    <li>Time-ordered exponentials for non-autonomous systems and their Magnus expansion.</li>
+  </ol>
+
+  <hr/>
+
+  <!-- 1.3.1 -->
+  <h3 id="sec-1-3-1">1.3.1 Flows as One-Parameter Groups of Diffeomorphisms</h3>
+
+  <p>
+    Let \(M\) be a smooth manifold and \(f\) a smooth vector field on \(M\).
+    As previously defined, the flow of \(f\) is a smooth mapping
+  </p>
+
+  <p class="math">\[
+      \varphi : D \subset \mathbb{R} \times M \to M, \qquad
+      (t,x) \mapsto \varphi(t,x),
+  \]</p>
+
+  <p>
+    where \(D\) is an open neighbourhood of \(\{0\}\times M\) and \(\varphi(0,x)=x\).
+    For each fixed \(t\), define the <em>time-\(t\) map</em> \(\varphi^t(x):=\varphi(t,x)\).
+  </p>
+
+  <p>
+    When the system is autonomous, the collection
+    \(\{\varphi^t\}_{t\in\mathbb{R}}\) satisfies the <strong>group property</strong>:
+  </p>
+
+  <p class="math">\[
+      \varphi^{t+s} = \varphi^t \circ \varphi^s,  \qquad  \varphi^0 = \mathrm{id}_M.
+  \]</p>
+
+  <p>
+    Thus each \(\varphi^t\) is a diffeomorphism and the flow is a one-parameter
+    subgroup of \(\mathrm{Diff}(M)\), the infinite-dimensional Lie group of
+    diffeomorphisms of \(M\).  
+    See Abraham–Marsden <span class="citation">[AM78]</span> for classical foundations.
+  </p>
+
+  <h4>Linearisation and tangent dynamics</h4>
+
+  <p>
+    Differentiating the flow map with respect to initial conditions yields the
+    <strong>variational equation</strong>:
+  </p>
+
+  <p class="math">\[
+      \frac{d}{dt}\Big(D\varphi^t(x)\Big)
+      = Df(\varphi^t(x)) \, D\varphi^t(x).
+  \]</p>
+
+  <p>
+    This governs the evolution of small perturbations. The matrix
+    \(D\varphi^t(x)\) is the key object in deciding whether the flow preserves
+    structures such as a symplectic form \(\omega\) or a volume form \(\mathrm{d}V\).
+  </p>
+
+  <hr/>
+
+  <!-- 1.3.2 -->
+  <h3 id="sec-1-3-2">1.3.2 The Lie Derivative: The Infinitesimal Generator of the Flow</h3>
+
+  <p>
+    A fundamental concept in differential geometry is that a vector field acts as an
+    <strong>infinitesimal derivation</strong> on functions, tensor fields, and forms.
+    This is formalised via the <em>Lie derivative</em>.
+  </p>
+
+  <h4>Action on functions</h4>
+
+  <p>
+    For a smooth function \(g : M \to \mathbb{R}\), the Lie derivative of \(g\) along \(f\)
+    is defined by
+  </p>
+
+  <p class="math">\[
+      (\mathcal{L}_f g)(x)
+      = \left.\frac{d}{dt}\right|_{t=0} g(\varphi^t(x))
+      = \nabla g(x)\cdot f(x).
+  \]</p>
+
+  <p>
+    Thus \(f\) acts as a first-order differential operator. This is the basis for the
+    concept of <em>invariant functions</em>, \(\mathcal{L}_f g = 0\), as covered in §1.2.
+  </p>
+
+  <h4>Action on vector fields</h4>
+
+  <p>
+    For a vector field \(X\) on \(M\), its Lie derivative with respect to \(f\) is
+    the commutator:
+  </p>
+
+  <p class="math">\[
+      \mathcal{L}_f X = [f,X].
+  \]</p>
+
+  <p>
+    The commutator captures algebraic structure of vector fields and is the
+    starting point for the Baker–Campbell–Hausdorff series used in splitting methods.
+  </p>
+
+  <hr/>
+
+  <!-- 1.3.3 -->
+  <h3 id="sec-1-3-3">1.3.3 Exponential of a Vector Field and Formal Flow Maps</h3>
+
+  <p>
+    A central conceptual tool is the formal identification of the flow \(\varphi^t\)
+    of an autonomous vector field \(f\) with the exponential of the derivation
+    \(f\cdot\nabla\).  Let
+  </p>
+
+  <p class="math">\[
+      F := f\cdot\nabla
+      = \sum_{i=1}^d f_i(x)\frac{\partial}{\partial x_i}.
+  \]</p>
+
+  <p>
+    The flow operator acting on functions satisfies the ODE
+  </p>
+
+  <p class="math">\[
+      \frac{d}{dt}(g \circ \varphi^t) = F(g\circ \varphi^t), \qquad (g\circ\varphi^0)=g.
+  \]</p>
+
+  <p>
+    Solving gives the formal exponential representation:
+  </p>
+
+  <p class="math">\[
+      g(\varphi^t(x)) = \big(e^{tF}g\big)(x),
+  \]</p>
+
+  <p>
+    where
+  </p>
+
+  <p class="math">\[
+      e^{tF} = \sum_{n=0}^\infty \frac{t^n}{n!} F^n.
+    \]</p>
+
+  <p>
+    The operator \(e^{tF}\) is thus the abstract “flow operator.” In geometric
+    numerical integration, splitting methods approximate \(e^{h(A+B)}\) by
+    compositions of \(e^{hA}\) and \(e^{hB}\).
+  </p>
+
+  <h4>Figure 1.3 — Illustration of flow as exponential of generator</h4>
+
+  <figure id="fig-1-3">
+    <svg width="520" height="200" style="border:1px solid #ccc;">
+      <!-- Conceptual diagram -->
+      <text x="20" y="100" font-size="14">x</text>
+      <text x="80" y="100" font-size="14">→</text>
+      <text x="120" y="100" font-size="16">e^{tF}x</text>
+      <line x1="130" y1="105" x2="260" y2="105"
+            stroke="black" stroke-width="1" marker-end="url(#arrow)"/>
+      <text x="270" y="100" font-size="14">φ^t(x)</text>
+
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10"
+                refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L9,3 z" fill="#000" />
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>
+      <strong>Figure 1.3</strong> – The flow \(\varphi^t\) corresponds formally to
+      the exponential map \(e^{tF}\) of the differential operator \(F=f\cdot\nabla\).
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 1.3.4 -->
+  <h3 id="sec-1-3-4">1.3.4 Baker–Campbell–Hausdorff (BCH) and the Lie Algebra of Flows</h3>
+
+  <p>
+    The set of vector fields on a manifold forms a Lie algebra under the commutator
+    \([f,g]\).  
+    The exponentials \(e^{tF}\) form local flows, and compositions of flows can be
+    described using the <strong>Baker–Campbell–Hausdorff formula</strong>:
+  </p>
+
+  <p class="math">\[
+      e^{hA} e^{hB}
+      = \exp\!\left(
+        h(A+B)
+        + \tfrac{h^2}{2}[A,B]
+        + \tfrac{h^3}{12}[A,[A,B]]
+        - \tfrac{h^3}{12}[B,[A,B]]
+        + \cdots
+      \right).
+  \]</p>
+
+  <p>
+    In our context, \(A\) and \(B\) are differential operators associated with
+    vector fields (or Hamiltonian vector fields), and the BCH formula gives the
+    exact vector field whose flow is approximated by a composition of subflows.
+  </p>
+
+  <p>
+    This is the algebraic backbone of splitting methods, composition methods,
+    and Magnus integrators. See Blanes & Casas <span class="citation">[BC26]</span> or
+    Hairer–Lubich–Wanner <span class="citation">[HLW06]</span>.
+  </p>
+
+  <hr/>
+
+  <!-- 1.3.5 -->
+  <h3 id="sec-1-3-5">1.3.5 Non-Autonomous Flows and Time-Ordered Exponentials</h3>
+
+  <p>
+    For non-autonomous systems,
+  </p>
+
+  <p class="math">\[
+      \dot{y} = f(t,y),
+    \]</p>
+
+  <p>
+    the evolution operator \(\Phi^{t,s}\) (flow from time \(s\) to \(t\)) satisfies
+  </p>
+
+  <p class="math">\[
+      \frac{\partial}{\partial t}(\Phi^{t,s}g)
+      = F(t)\,\Phi^{t,s}g,
+      \qquad F(t) := f(t,\cdot)\cdot\nabla,
+  \]</p>
+
+  <p>
+    with \(\Phi^{s,s}=\mathrm{id}\). The formal solution is a
+    <strong>time-ordered exponential</strong>:
+  </p>
+
+  <p class="math">\[
+      \Phi^{t,s} = \mathcal{T}\exp\!\left(
+        \int_s^t F(\tau)\, d\tau
+      \right),
+  \]</p>
+
+  <p>
+    where \(\mathcal{T}\) denotes chronological ordering:
+  </p>
+
+  <p class="math">\[
+      \mathcal{T}\exp\!\left(\int_s^t F(\tau)\,d\tau\right)
+      = \mathrm{id}
+      + \int_s^t F(\tau_1)d\tau_1
+      + \int_s^t\!\!\int_s^{\tau_1}
+        F(\tau_1)F(\tau_2)\,d\tau_2\,d\tau_1
+      + \cdots
+    \]</p>
+
+  <p>
+    This formula is computationally useless in raw form, but it is the foundation
+    for the <strong>Magnus expansion</strong>, which provides computable closed-form
+    commutator expressions for accurate integrators of non-autonomous linear systems.
+    See <span class="citation">[BC26, Ch. 5]</span>.
+  </p>
+
+  <hr/>
+
+  <!-- 1.3.6 -->
+  <h3 id="sec-1-3-6">1.3.6 Interactive Example: Flow Composition and BCH Behaviour</h3>
+
+  <p>
+    The example below shows how the composition of two simple planar flows
+    behaves differently from their combined flow, illustrating non-commutativity
+    of vector fields and the emergence of commutator terms.
+  </p>
+
+  <p>
+    We consider vector fields
+  </p>
+
+  <p class="math">\[
+      f(x,y) = (1,\,0), \qquad
+      g(x,y) = (0,\,x),
+    \]</p>
+
+  <p>
+    whose flows do not commute.
+  </p>
+
+  <figure id="fig-1-4">
+    <canvas id="bchCanvas" width="520" height="260"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 1.4</strong> – Numerical experiment showing the non-commutativity
+      of flows. We compare the composition
+      \( \varphi_f^h \circ \varphi_g^h \) with
+      \( \varphi_g^h \circ \varphi_f^h \).
+    </figcaption>
+  </figure>
+
+  <script>
+    (function(){
+      const canvas = document.getElementById('bchCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      const w = canvas.width, h = canvas.height;
+      ctx.font="12px sans-serif";
+
+      // coordinate transforms
+      const xmin=-1, xmax=3, ymin=-1, ymax=3;
+      const X = x => (x-xmin)/(xmax-xmin)*w;
+      const Y = y => h - (y-ymin)/(ymax-ymin)*h;
+
+      // vector fields
+      function f(x,y){ return {dx:1, dy:0}; }
+      function g(x,y){ return {dx:0, dy:x}; }
+
+      // flows for small h
+      const hstep = 0.4;
+      function flowF(x,y){
+        return {x:x + hstep, y:y};
+      }
+      function flowG(x,y){
+        return {x:x, y:y + hstep*x};
+      }
+
+      // initial point
+      const x0 = 0.2, y0 = 0.5;
+
+      // compositions
+      let A = flowF(flowG(x0,y0).x, flowG(x0,y0).y); // F∘G
+      let B = flowG(flowF(x0,y0).x, flowF(x0,y0).y); // G∘F
+
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle="#000";
+
+      // axes
+      ctx.beginPath();
+      ctx.moveTo(X(xmin), Y(0));
+      ctx.lineTo(X(xmax), Y(0));
+      ctx.moveTo(X(0), Y(ymin));
+      ctx.lineTo(X(0), Y(ymax));
+      ctx.strokeStyle="#888";
+      ctx.stroke();
+
+      // draw points
+      function drawPoint(pt,color,label){
+        ctx.fillStyle=color;
+        ctx.beginPath();
+        ctx.arc(X(pt.x),Y(pt.y),5,0,2*Math.PI);
+        ctx.fill();
+        ctx.fillText(label, X(pt.x)+7, Y(pt.y)-7);
+      }
+
+      drawPoint({x:x0,y:y0}, "#000", "x0");
+      drawPoint(A, "#c00", "F∘G");
+      drawPoint(B, "#006", "G∘F");
+
+      // legend
+      ctx.fillStyle="#c00"; ctx.fillRect(20,20,10,10);
+      ctx.fillStyle="#000"; ctx.fillText("F∘G", 40, 28);
+      ctx.fillStyle="#06c"; ctx.fillRect(20,40,10,10);
+      ctx.fillStyle="#000"; ctx.fillText("G∘F", 40, 48);
+    })();
+  </script>
+
+  <p>
+    The separation of the red and blue points visualises the Lie bracket
+    \([f,g]\neq 0\).  In splitting methods of order &gt; 1, these commutators
+    appear explicitly in the error terms and are managed by higher-order compositions.
+  </p>
+
+  <hr/>
+
+  <!-- 1.3.7 -->
+  <h3 id="sec-1-3-7">1.3.7 Summary</h3>
+
+  <p>
+    In this section we have:
+  </p>
+
+  <ul>
+    <li>Identified flows as one-parameter subgroups of diffeomorphisms,</li>
+    <li>Introduced Lie derivatives as infinitesimal generators,</li>
+    <li>Defined formal flow operators via exponentials of differential operators,</li>
+    <li>Shown how BCH governs compositions of flows,</li>
+    <li>Explained time-ordered exponentials and Magnus expansions for non-autonomous systems,</li>
+    <li>Illustrated non-commutativity of vector fields via interactive examples.</li>
+  </ul>
+
+  <p>
+    These ideas form the algebraic-geometric backbone of modern structure-preserving
+    algorithms. We now move to Chapter 2, where symplectic geometry and Hamiltonian
+    flows are developed rigorously.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-1-3-8">1.3.8 References for Section 1.3</h3>
+
+  <ol>
+    <li>
+      <strong>[AM78]</strong> R. Abraham &amp; J.E. Marsden,
+      <em>Foundations of Mechanics</em>,
+      Benjamin/Cummings, 1978.
+    </li>
+    <li>
+      <strong>[HLW06]</strong> E. Hairer, C. Lubich &amp; G. Wanner,
+      <em>Geometric Numerical Integration</em>, 2nd ed.,
+      Springer, 2006.
+    </li>
+    <li>
+      <strong>[BC26]</strong> S. Blanes &amp; F. Casas,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>,
+      2nd ed., CRC Press, 2026.
+    </li>
+  </ol>
+
+</section>
+
+<hr />
+<nav style="background:#eee; padding:0.5em; margin-top:1em;">
+    <a href="toc.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a href="chapter02.html">Next</a>
+</nav>
+</body>
+
+</html>

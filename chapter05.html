@@ -1,0 +1,2067 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 5 - Geometric Numerical Integration</title>
+    <style>
+        body {
+            font-family: serif;
+            line-height: 1.5;
+            margin: 2em;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: Georgia, serif;
+        }
+
+        code {
+            background: #eee;
+            padding: 2px 4px;
+        }
+
+        .task {
+            color: #777;
+            font-style: italic;
+        }
+
+        a {
+            text-decoration: none;
+            color: #006;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>5. Exponential Integrators and Magnus Expansions</h1>
+    <nav style="background:#eee; padding:0.5em; margin-bottom:1em;">
+        <a href="chapter04.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a
+            href="chapter06.html">Next</a>
+    </nav>
+    <hr /><section id="sec-5-1">
+  <h2>5.1 Symplectic Runge–Kutta Methods</h2>
+
+  <p>
+    Symplectic Runge–Kutta (SRK) methods form the second main family of geometric
+    integrators after splitting methods.  
+    They act directly on the system of ODEs instead of decomposing the vector field.
+    Their key virtues:
+  </p>
+
+  <ul>
+    <li><strong>symplecticity</strong> for Hamiltonian systems,</li>
+    <li><strong>high order</strong> (order up to 2s for s stages),</li>
+    <li><strong>excellent long-time energy behaviour</strong>,</li>
+    <li><strong>strong stability</strong> for moderately stiff systems,</li>
+    <li>compatibility with <strong>implicit variational structure</strong>.</li>
+  </ul>
+
+  <p>
+    The classical example: the <strong>Gauss–Legendre collocation integrators</strong>,
+    which are implicit, A-stable, symmetric, symplectic, and of order
+    <span class="math">2s</span> for <span class="math">s</span> stages.
+  </p>
+
+  <hr/>
+
+  <!-- 5.1.1 -->
+  <h3 id="sec-5-1-1">5.1.1 Hamiltonian ODEs and Symplecticity Conditions</h3>
+
+  <p>
+    Consider an autonomous Hamiltonian system on <span class="math">\(\mathbb{R}^{2m}\)</span>:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{y} = J^{-1} \nabla H(y), \qquad
+      J = \begin{pmatrix} 0&-I\\ I&0 \end{pmatrix}.
+    \]
+  </p>
+
+  <p>
+    A Runge–Kutta method with Butcher tableau:
+  </p>
+
+  <figure id="fig-5-1" style="text-align:center; margin:1em;">
+    <table style="margin:0 auto; border-collapse:collapse; font-size: 14px;">
+      <tr><td style="border:1px solid #ccc; padding:4px;">c_i</td>
+          <td style="border:1px solid #ccc; padding:4px;" colspan="3">a_{ij}</td></tr>
+      <tr><td style="border:1px solid #ccc; padding:4px;">&nbsp;</td>
+          <td style="border:1px solid #ccc; padding:4px;">b_1</td>
+          <td style="border:1px solid #ccc; padding:4px;">b_2</td>
+          <td style="border:1px solid #ccc; padding:4px;">b_3</td></tr>
+    </table>
+    <figcaption><strong>Figure 5.1</strong> – Generic Runge–Kutta tableau.</figcaption>
+  </figure>
+
+  <p>
+    is <strong>symplectic</strong> if and only if:
+  </p>
+
+  <p class="math">
+    \[
+      b_i a_{ij} + b_j a_{ji} - b_i b_j = 0
+      \qquad \text{for all } i,j.
+    \tag{5.1.1}
+    \]
+  </p>
+
+  <p>
+    This set of bilinear conditions characterises exactly those RK methods that preserve
+    the canonical two-form <span class="math">\(\omega = dq \wedge dp\)</span>.
+  </p>
+
+  <hr/>
+
+  <!-- 5.1.2 -->
+  <h3 id="sec-5-1-2">5.1.2 Gauss–Legendre Collocation Methods</h3>
+
+  <p>
+    The Gauss–Legendre nodes <span class="math">c_i</span> in <span class="math">[0,1]</span> are roots of:
+  </p>
+
+  <p class="math">
+    \[
+      P_s(2c-1)=0,
+    \]
+  </p>
+
+  <p>
+    where <span class="math">P_s</span> is the Legendre polynomial of degree <span class="math">s</span>.
+  </p>
+
+  <p>
+    The associated collocation method has:
+  </p>
+
+  <ul>
+    <li>order <strong>2s</strong>,</li>
+    <li>symmetry (time reversibility),</li>
+    <li>A-stability (excellent stiffness damping),</li>
+    <li><strong>symplecticity</strong> (via condition (5.1.1)).</li>
+  </ul>
+
+  <p>
+    The Butcher coefficients are:
+  </p>
+
+  <p class="math">
+    \[
+      a_{ij} = \int_0^{c_i} \ell_j(\tau)\, d\tau,\qquad
+      b_j = \int_0^1 \ell_j(\tau)\, d\tau,
+    \]
+  </p>
+
+  <p>
+    where <span class="math">\(\ell_j\)</span> are the Lagrange basis polynomials at the Gauss nodes.
+  </p>
+
+  <p>
+    These are the highest-order (per stage) RK methods known, and are optimal for many Hamiltonian problems.
+  </p>
+
+  <hr/>
+
+  <!-- 5.1.3 -->
+  <h3 id="sec-5-1-3">5.1.3 Variational Derivation of Symplectic RK Methods</h3>
+
+  <p>
+    SRK methods arise naturally from a <strong>discrete variational principle</strong>.
+    For a Lagrangian <span class="math">L(q,\dot{q})</span>:
+  </p>
+
+  <p class="math">
+    \[
+      S[q] = \int_0^h L(q,\dot q)\,dt.
+    \]
+  </p>
+
+  <p>
+    Approximate the trajectory inside each timestep by a polynomial interpolant
+    defined at stage points:
+  </p>
+
+  <p class="math">
+    \[
+      q(t) \approx \sum_{j=1}^s q_j \ell_j(t/h).
+    \]
+  </p>
+
+  <p>
+    Then extremise the discrete action:
+  </p>
+
+  <p class="math">
+    \[
+      S_h(q_1,\dots,q_s) = h \sum_{i=1}^s b_i\, L(q_i, \dot{q}_i).
+    \]
+  </p>
+
+  <p>
+    The resulting discrete Euler–Lagrange equations produce exactly the SRK update.
+  </p>
+
+  <p>
+    This variational origin guarantees <strong>symplecticity, momentum conservation,
+    and excellent energy behaviour</strong>.
+  </p>
+
+  <hr/>
+
+  <!-- 5.1.4 -->
+  <h3 id="sec-5-1-4">5.1.4 Example: Gauss–2 (Order 4) Symplectic Integrator</h3>
+
+  <p>
+    For <span class="math">s=2</span>, the Gauss nodes are:
+  </p>
+
+  <p class="math">
+    \[
+      c_{1,2} = \tfrac{1}{2} \mp \tfrac{\sqrt{3}}{6}.
+    \]
+  </p>
+
+  <p>
+    The resulting method has:
+  </p>
+
+  <ul>
+    <li>order 4,</li>
+    <li>symplectic,</li>
+    <li>symmetric,</li>
+    <li>A-stable.</li>
+  </ul>
+
+  <p>
+    This is one of the best all-purpose geometric ODE solvers available.
+  </p>
+
+  <hr/>
+
+  <!-- 5.1.5 -->
+  <h3 id="sec-5-1-5">5.1.5 Phase Accuracy and Long-Time Behaviour</h3>
+
+  <p>
+    A hallmark of Gauss collocation methods: their <strong>superior phase accuracy</strong>
+    for Hamiltonian oscillatory systems.  
+    For a harmonic oscillator:
+  </p>
+
+  <p class="math">
+    \[
+      y' = J^{-1} \nabla \tfrac{1}{2}(q^2+p^2),
+    \]
+  </p>
+
+  <p>
+    the Gauss-2 method yields:
+  </p>
+
+  <ul>
+    <li>near-exact frequency,</li>
+    <li>near-conservation of quadratic invariants,</li>
+    <li>bounded energy error for exponentially long times.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.1.6 -->
+  <h3 id="sec-5-1-6">5.1.6 Interactive Illustration: Gauss-2 vs Explicit RK4 for Harmonic Oscillator</h3>
+
+  <p>
+    Comparison of energy drift:
+  </p>
+
+  <figure id="fig-5-2" style="text-align:center;">
+    <canvas id="gaussDemo" width="600" height="280"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 5.2</strong> – Gauss-2 (blue) shows bounded energy oscillations;
+      explicit RK4 (red) accumulates drift.
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("gaussDemo");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+
+    const hstep = 0.1;
+
+    // Harmonic oscillator flow
+    function f([q,p]){ return [p, -q]; }
+
+    // Explicit RK4
+    function RK4(z){
+      const k1=f(z);
+      const k2=f([z[0]+0.5*hstep*k1[0], z[1]+0.5*hstep*k1[1]]);
+      const k3=f([z[0]+0.5*hstep*k2[0], z[1]+0.5*hstep*k2[1]]);
+      const k4=f([z[0]+hstep*k3[0], z[1]+hstep*k3[1]]);
+      return [
+        z[0] + hstep*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
+        z[1] + hstep*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6
+      ];
+    }
+
+    // Gauss-2 (implicit) approximated by fixed-point iteration
+    function Gauss2(z){
+      const c1=0.5 - Math.sqrt(3)/6;
+      const c2=0.5 + Math.sqrt(3)/6;
+      const b1=b2=0.5;
+
+      // stage initial guesses
+      let Z1=[z[0],z[1]];
+      let Z2=[z[0],z[1]];
+      const iters=3;
+      for(let k=0;k<iters;k++){
+        const f1=f(Z1), f2=f(Z2);
+        Z1=[z[0] + hstep*(a11*f1[0] + a12*f2[0]),
+            z[1] + hstep*(a11*f1[1] + a12*f2[1])];
+        Z2=[z[0] + hstep*(a21*f1[0] + a22*f2[0]),
+            z[1] + hstep*(a21*f1[1] + a22*f2[1])];
+      }
+      const f1=f(Z1), f2=f(Z2);
+      return [
+        z[0] + hstep*0.5*(f1[0]+f2[0]),
+        z[1] + hstep*0.5*(f1[1]+f2[1])
+      ];
+    }
+
+    // Gauss a-coefficients
+    const a11=0.25, a12=0.25-Math.sqrt(3)/6;
+    const a21=0.25+Math.sqrt(3)/6, a22=0.25;
+
+    let zG=[1,0], z4=[1,0];
+    let t=0;
+
+    function H(z){ return 0.5*(z[0]*z[0]+z[1]*z[1]); }
+
+    function animate(){
+      t+=hstep;
+      z4=RK4(z4);
+      zG=Gauss2(zG);
+
+      const x=t;
+      const y4 = h*0.7 - 40*(H(z4)-0.5);
+      const yG = h*0.3 - 40*(H(zG)-0.5);
+
+      ctx.fillStyle="#c00"; ctx.fillRect(x,y4,2,2);
+      ctx.fillStyle="#00c"; ctx.fillRect(x,yG,2,2);
+
+      if(x<w) requestAnimationFrame(animate);
+    }
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 5.1.7 -->
+  <h3 id="sec-5-1-7">5.1.7 SRK Methods for Stiff and Semi-Stiff Hamiltonians</h3>
+
+  <p>
+    Gauss methods are algebraically stable and A-stable.
+    Thus they handle:
+  </p>
+
+  <ul>
+    <li>weakly stiff Hamiltonians,</li>
+    <li>high-frequency oscillations,</li>
+    <li>semi-linear PDEs (after spatial discretisation),</li>
+    <li>celestial mechanics near resonances.</li>
+  </ul>
+
+  <p>
+    They are often the preferred integrator when:
+  </p>
+
+  <ul>
+    <li>splitting is impossible or inefficient,</li>
+    <li>the Hamiltonian is non-separable,</li>
+    <li>coupling is fully implicit.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.1.8 -->
+  <h3 id="sec-5-1-8">5.1.8 Summary</h3>
+
+  <ul>
+    <li>SRK methods preserve symplecticity exactly.</li>
+    <li>Gauss–Legendre collocation gives order <strong>2s</strong>.</li>
+    <li>Variational derivation provides strong geometric invariance.</li>
+    <li>SRK methods excel in long-time accuracy and stiff Hamiltonian problems.</li>
+    <li>They complement splitting methods; neither replaces the other.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.1.9 -->
+  <h3 id="sec-5-1-9">5.1.9 References for Section 5.1</h3>
+
+  <ol>
+    <li>Hairer–Lubich–Wanner (2006). <em>Geometric Numerical Integration</em>.</li>
+    <li>Blanes & Casas (2026). <em>Concise Introduction to GNI</em>.</li>
+    <li>Butcher (2003). <em>Numerical Methods for ODEs</em>.</li>
+    <li>Sanz-Serna (1988). “Runge–Kutta schemes for Hamiltonian systems”.</li>
+    <li>Suris (1990–2020). Foundations of variational integrators.</li>
+  </ol>
+
+</section>
+
+<section id="sec-5-2">
+  <h2>5.2 Algebraic Order Conditions and B-Series for Symplectic RK Methods</h2>
+
+  <p>
+    Runge–Kutta (RK) methods admit an algebraic representation of their action
+    on differential equations through <strong>B-series</strong>.  
+    These are formal expansions indexed by rooted trees, which encode precisely how an RK method approximates the Taylor expansion of the exact flow.
+  </p>
+
+  <p>
+    This section introduces the B-series formalism, describes order conditions,
+    and explains why <strong>symplectic Runge–Kutta methods naturally restrict to <em>symplectic B-series</em></strong>, leading to:
+  </p>
+
+  <ul>
+    <li>automatic conservation of quadratic invariants,</li>
+    <li>the special structure that gives Gauss methods order \(2s\),</li>
+    <li>deep links to the Butcher group and pre-Lie algebra of rooted trees.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.2.1 -->
+  <h3 id="sec-5-2-1">5.2.1 Rooted Trees and Elementary Differentials</h3>
+
+  <p>
+    For an autonomous ODE <span class="math">\(\dot{y}=f(y)\)</span>, 
+    the Taylor expansion of the exact flow can be written using <strong>rooted trees</strong>.
+  </p>
+
+  <p class="math">
+    \[
+      y(h) = y(0) + h f
+      + \frac{h^2}{2} f'f
+      + \frac{h^3}{6} \big(f''(f,f) + f'(f'f)\big)
+      + \cdots.
+    \]
+  </p>
+
+  <p>
+    Each term corresponds to a <em>rooted tree</em>.  
+    For example:
+  </p>
+
+  <figure id="fig-5-3" style="text-align:center;">
+    <svg width="400" height="160">
+      <!-- tree tau1: single node -->
+      <circle cx="60" cy="40" r="6" fill="#333"/>
+      <text x="60" y="70" text-anchor="middle">τ₁: order 1</text>
+
+      <!-- tree tau2: one branch -->
+      <circle cx="170" cy="40" r="6" fill="#333"/>
+      <circle cx="170" cy="90" r="6" fill="#333"/>
+      <line x1="170" y1="46" x2="170" y2="84" stroke="#333"/>
+      <text x="170" y="120" text-anchor="middle">τ₂: order 2</text>
+
+      <!-- tree tau3: two subtrees -->
+      <circle cx="300" cy="40" r="6" fill="#333"/>
+      <circle cx="280" cy="90" r="6" fill="#333"/>
+      <circle cx="320" cy="90" r="6" fill="#333"/>
+      <line x1="300" y1="46" x2="280" y2="84" stroke="#333"/>
+      <line x1="300" y1="46" x2="320" y2="84" stroke="#333"/>
+      <text x="300" y="120" text-anchor="middle">τ₃: order 3</text>
+    </svg>
+    <figcaption><strong>Figure 5.3</strong> – Typical rooted trees.</figcaption>
+  </figure>
+
+  <p>
+    For a tree <span class="math">\(\tau\)</span>, the associated <strong>elementary differential</strong> is denoted
+  </p>
+
+  <p class="math">
+    \[
+      F(\tau)(y) \in \mathbb{R}^m.
+    \]
+  </p>
+
+  <p>
+    The exact flow has a B-series:
+  </p>
+
+  <p class="math">
+    \[
+      \phi_h(y) = y + \sum_{\tau\in\mathcal{T}} 
+        \frac{h^{|\tau|}}{\sigma(\tau)} F(\tau)(y).
+    \tag{5.2.1}
+    \]
+  </p>
+
+  <hr/>
+
+  <!-- 5.2.2 -->
+  <h3 id="sec-5-2-2">5.2.2 B-Series of a Runge–Kutta Method</h3>
+
+  <p>
+    Any (consistent) RK method produces a B-series:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h(y) = y + \sum_{\tau\in\mathcal{T}}
+        h^{|\tau|}\alpha(\tau)F(\tau)(y),
+    \tag{5.2.2}
+    \]
+  </p>
+
+  <p>
+    where <span class="math">\(\alpha(\tau)\)</span> are algebraic expressions in <span class="math">a_{ij},b_i,c_i</span>.
+  </p>
+
+  <p>
+    The method has order <span class="math">p</span> if and only if:
+  </p>
+
+  <p class="math">
+    \[
+      \alpha(\tau) = \frac{1}{\sigma(\tau)}
+      \qquad \text{for all } |\tau|\le p.
+    \tag{5.2.3}
+    \]
+  </p>
+
+  <hr/>
+
+  <!-- 5.2.3 -->
+  <h3 id="sec-5-2-3">5.2.3 The Butcher Group</h3>
+
+  <p>
+    B-series form a group under composition: the <strong>Butcher group</strong> \(G_B\).
+  </p>
+
+  <p>
+    Key facts:
+  </p>
+
+  <ul>
+    <li><strong>Exact flows</strong> form a subgroup.</li>
+    <li>The <strong>inverse B-series</strong> corresponds to running a method backward in time.</li>
+    <li>Symmetric RK methods correspond to <strong>group involutions</strong>.</li>
+    <li>Composition of integrators corresponds to multiplication in \(G_B\).</li>
+  </ul>
+
+  <p>
+    Gauss collocation methods correspond to <em>the exponential of the truncated pre-Lie product</em> associated with the vector field.
+  </p>
+
+  <hr/>
+
+  <!-- 5.2.4 -->
+  <h3 id="sec-5-2-4">5.2.4 Symplectic RK Methods and Symplectic B-Series</h3>
+
+  <p>
+    For Hamiltonian ODEs <span class="math">\(\dot{y}=J^{-1}\nabla H(y)\)</span>,  
+    the exact B-series satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      \phi_h^*(\omega) = \omega,
+    \]
+  </p>
+
+  <p>
+    where <span class="math">\(\omega\)</span> is the symplectic form.
+  </p>
+
+  <p>
+    An RK B-series is symplectic if and only if the Butcher coefficients satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      b_i a_{ij} + b_j a_{ji} - b_i b_j = 0,
+    \tag{5.1.1 revisited}
+    \]
+  </p>
+
+  <p>
+    These constraints <strong>force the B-series coefficients into the Hamiltonian sub-group 
+    of the Butcher group</strong>.
+  </p>
+
+  <p>
+    Consequences:
+  </p>
+
+  <ul>
+    <li>quadratic invariants are preserved exactly,</li>
+    <li>energy is nearly conserved over exponentially long times,</li>
+    <li>Hamiltonian structure is respected at the series level.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.2.5 -->
+  <h3 id="sec-5-2-5">5.2.5 Why Gauss–Legendre RK Has Order 2s</h3>
+
+  <p>
+    A Gauss–Legendre collocation method with <span class="math">s</span> stages satisfies all order
+    conditions up to order <strong>2s</strong>.  
+    This follows because:
+  </p>
+
+  <ol>
+    <li>
+      Collocation enforces the differential equation exactly on the space of
+      <em>interpolating polynomials</em> of degree <span class="math">2s-1</span>.
+    </li>
+    <li>
+      Quadrature is exact for polynomials up to degree <span class="math">2s-1</span>.
+    </li>
+    <li>
+      The trees correspond to compositions of derivatives of degree up to <span class="math">2s</span>.
+    </li>
+  </ol>
+
+  <p>
+    This gives the celebrated <strong>order-barrier optimality result</strong>:
+  </p>
+
+  <p class="math" style="font-size: 120%; font-weight: bold;">
+    \[
+      \text{For any s-stage RK method: } \quad p \le 2s.
+    \]
+  </p>
+
+  <p>
+    Gauss methods achieve this bound with equality.
+  </p>
+
+  <hr/>
+
+  <!-- 5.2.6 -->
+  <h3 id="sec-5-2-6">5.2.6 Interpretation via Pre-Lie Algebra of Rooted Trees</h3>
+
+  <p>
+    Rooted trees form a <strong>pre-Lie algebra</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      \tau_1 \triangleright \tau_2 = \text{sum over graftings of the root of } \tau_1 \text{ onto each node of } \tau_2.
+    \]
+  </p>
+
+  <p>
+    The exact solution is the <em>Lie exponential</em> of the vector field in this algebra:
+  </p>
+
+  <p class="math">
+    \[
+      \phi_h = \exp_{\triangleright}(h f).
+    \]
+  </p>
+
+  <p>
+    Gauss methods are the <strong>truncated exponential</strong> of this pre-Lie product,
+    preserving symplecticity by restriction to the Hamiltonian subalgebra.
+  </p>
+
+  <p>
+    This provides the deepest algebraic explanation for their optimal order,
+    symmetry, and geometric behaviour.
+  </p>
+
+  <hr/>
+
+  <!-- 5.2.7 -->
+  <h3 id="sec-5-2-7">5.2.7 Summary</h3>
+
+  <ul>
+    <li>B-series provide a universal algebraic description of RK methods.</li>
+    <li>Order conditions correspond to matching exact B-series coefficients.</li>
+    <li>Symplectic RK methods satisfy special bilinear constraints → Hamiltonian B-series subgroup.</li>
+    <li>Gauss–Legendre collocation achieves the maximal possible order \(2s\).</li>
+    <li>Underlying structure: pre-Lie algebra of rooted trees + Butcher group.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.2.8 -->
+  <h3 id="sec-5-2-8">5.2.8 References for Section 5.2</h3>
+
+  <ol>
+    <li>Hairer–Lubich–Wanner (2006). <em>Geometric Numerical Integration</em>.</li>
+    <li>Butcher (1972–2003). <em>Tree theory and B-series</em>.</li>
+    <li>Munthe-Kaas & Wright (2008–2020). <em>Pre-Lie algebra and Lie–Butcher series</em>.</li>
+    <li>Chartier, Hairer, Vilmart (2010–2023). <em>Symplectic B-series integrators</em>.</li>
+    <li>Iserles, Quispel, Nørsett (1999). “Lie-group methods and B-series”.</li>
+  </ol>
+
+</section>
+
+<section id="sec-5-3">
+  <h2>5.3 Symmetric, Symplectic, and Energy-Preserving RK Methods</h2>
+
+  <p>
+    Symmetry (time reversibility), symplecticity, and energy conservation are 
+    three of the most important geometric properties for numerical integrators
+    of Hamiltonian systems.  
+    While no Runge–Kutta method can preserve <em>all</em> invariants exactly, 
+    certain RK families preserve the <strong>symplectic form</strong>, 
+    <strong>quadratic invariants</strong>, and/or 
+    <strong>time-reversal symmetry</strong>, 
+    which in turn guarantees excellent long-time behaviour.
+  </p>
+
+  <p>
+    This section develops:
+  </p>
+
+  <ul>
+    <li>time symmetry (self-adjoint RK integrators),</li>
+    <li>symplectic and symmetric RK (SSRK) families,</li>
+    <li>energy-preserving RK: discrete gradient & AVF methods,</li>
+    <li>modified Hamiltonian structure from backward error analysis,</li>
+    <li>connections between symmetry and even order.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.3.1 -->
+  <h3 id="sec-5-3-1">5.3.1 Time Symmetry (Self-Adjoint RK Methods)</h3>
+
+  <p>
+    A one-step method <span class="math">\(\Phi_h\)</span> is <strong>symmetric</strong> (or 
+    <strong>time reversible</strong>) if:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_{-h} \circ \Phi_h = \mathrm{id}.
+    \tag{5.3.1}
+    \]
+  </p>
+
+  <p>
+    For RK methods with tableau <span class="math">\((A,b,c)\)</span>, symmetry requires:
+  </p>
+
+  <p class="math">
+    \[
+      c_i = 1 - c_{s+1-i}, \qquad
+      b_i = b_{s+1-i}, \qquad
+      a_{ij} = b_{j} - a_{s+1-i,s+1-j}.
+    \tag{5.3.2}
+    \]
+  </p>
+
+  <p>
+    Examples:
+  </p>
+
+  <ul>
+    <li>All <strong>Gauss–Legendre</strong> collocation methods are symmetric.</li>
+    <li>The implicit midpoint method is symmetric.</li>
+    <li>Explicit RK methods cannot be symmetric, except trivial ones.</li>
+  </ul>
+
+  <p>
+    Key fact:
+  </p>
+
+  <p class="math" style="font-weight:bold;">
+    A symmetric method automatically has <em>even order</em>.
+  </p>
+
+  <hr/>
+
+  <!-- 5.3.2 -->
+  <h3 id="sec-5-3-2">5.3.2 Symmetric + Symplectic → Excellent Long-Time Behaviour</h3>
+
+  <p>
+    When an RK method is both <strong>symplectic</strong> and <strong>symmetric</strong>:
+  </p>
+
+  <ul>
+    <li>it preserves phase volume,</li>
+    <li>backward error analysis yields a <strong>real, time-symmetric modified Hamiltonian</strong>,</li>
+    <li>the numerical trajectory stays on a smooth deformation of true energy level sets.</li>
+  </ul>
+
+  <p>
+    This is why <strong>Gauss methods</strong> are the gold standard:
+  </p>
+
+  <p class="math">
+    \[
+      \text{Gauss–Legendre RK} 
+      \quad \text{= symmetric + symplectic + order } 2s.
+    \]
+  </p>
+
+  <p>
+    This combination yields qualitatively correct behaviour over <em>astronomical</em> time spans.
+  </p>
+
+  <hr/>
+
+  <!-- 5.3.3 -->
+  <h3 id="sec-5-3-3">5.3.3 Backward Error Analysis: Modified Hamiltonians</h3>
+
+  <p>
+    A symplectic RK method applied to 
+    <span class="math">\(\dot{y}=J^{-1}\nabla H(y)\)</span> 
+    exactly solves a nearby Hamiltonian system:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{y} = J^{-1}\nabla \tilde{H}(y),
+    \]
+  </p>
+
+  <p>
+    where the <strong>modified Hamiltonian</strong> has a formal expansion:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{H} = H 
+      + h^p H_{p+1} 
+      + h^{p+2} H_{p+3}
+      + \cdots.
+    \tag{5.3.3}
+    \]
+  </p>
+
+  <p>
+    Key consequences:
+  </p>
+
+  <ul>
+    <li>Numerical energy error is nearly periodic (bounded) for exponentially long times.</li>
+    <li>No drift accumulates: the numerical trajectory is near the exact level set of <span class="math">\(\tilde{H}\)</span>.</li>
+    <li>Symmetry forces <span class="math">H_{p+2k+1}\equiv 0</span>, keeping the modified Hamiltonian <em>time-reversible</em>.</li>
+  </ul>
+
+  <figure id="fig-5-4" style="text-align:center;">
+    <svg width="450" height="180">
+      <!-- true level set -->
+      <ellipse cx="120" cy="90" rx="70" ry="45" fill="none" stroke="#777" stroke-width="2"/>
+      <text x="120" y="30" text-anchor="middle" font-size="12">H = constant</text>
+
+      <!-- modified level set -->
+      <ellipse cx="300" cy="90" rx="70" ry="45" fill="none" stroke="#0077cc" stroke-width="3"/>
+      <text x="300" y="30" text-anchor="middle" font-size="12">ℍ̃ = constant</text>
+    </svg>
+    <figcaption><strong>Figure 5.4</strong> – Symplectic RK follows modified Hamiltonian level curves.</figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 5.3.4 -->
+  <h3 id="sec-5-3-4">5.3.4 Energy-Preserving Runge–Kutta Methods</h3>
+
+  <p>
+    No ordinary RK method (explicit or implicit) can preserve a general Hamiltonian
+    <strong>exactly</strong>.  
+    But several specialized families achieve <strong>exact energy conservation</strong>
+    by modifying the discretisation:
+  </p>
+
+  <h4>• The Average Vector Field (AVF) Method</h4>
+
+  <p class="math">
+    \[
+      \frac{y_{n+1}-y_n}{h}
+      = \int_0^1 f\big(\theta y_{n+1} + (1-\theta)y_n\big)\, d\theta.
+    \]
+  </p>
+
+  <p>
+    For Hamiltonian systems, AVF preserves energy exactly:
+  </p>
+
+  <p class="math">
+    \[
+      H(y_{n+1}) = H(y_n).
+    \]
+  </p>
+
+  <h4>• Discrete Gradient Methods</h4>
+
+  <p>
+    Choose a discrete gradient 
+    <span class="math">\(\bar{\nabla}H(y_{n+1},y_n)\)</span> satisfying:
+  </p>
+
+  <p class="math">
+    \[
+      H(y_{n+1}) - H(y_n)
+      = \bar{\nabla}H(y_{n+1},y_n)^{\!\top} (y_{n+1}-y_n).
+    \tag{5.3.4}
+    \]
+  </p>
+
+  <p>
+    Then define an update:
+  </p>
+
+  <p class="math">
+    \[
+      \frac{y_{n+1} - y_n}{h}
+      = J^{-1} \bar{\nabla}H(y_{n+1},y_n).
+    \]
+  </p>
+
+  <p>
+    This preserves energy <em>exactly</em> for any Hamiltonian.
+  </p>
+
+  <h4>Energy-preserving ≠ Symplectic</h4>
+
+  <p>
+    There is a fundamental incompatibility:  
+    <strong>an RK method cannot be both symplectic and energy-preserving unless the Hamiltonian is quadratic.</strong>
+  </p>
+
+  <p>
+    Thus one chooses:
+  </p>
+
+  <ul>
+    <li><strong>symplectic</strong> for general long-time Hamiltonian fidelity, or</li>
+    <li><strong>energy-preserving</strong> when exact energy conservation is the priority.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.3.5 -->
+  <h3 id="sec-5-3-5">5.3.5 Comparison Chart: Symmetry, Symplecticity, Energy Preservation</h3>
+
+  <figure id="tab-5-1" style="text-align:center;">
+    <table style="margin:0 auto; border-collapse:collapse; width:90%; font-size:14px;">
+      <tr style="background:#eef;">
+        <th style="border:1px solid #ccc; padding:6px;">Method</th>
+        <th style="border:1px solid #ccc; padding:6px;">Symplectic?</th>
+        <th style="border:1px solid #ccc; padding:6px;">Symmetric?</th>
+        <th style="border:1px solid #ccc; padding:6px;">Exact Energy?</th>
+        <th style="border:1px solid #ccc; padding:6px;">Order</th>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc; padding:6px;">Gauss–s</td>
+        <td style="border:1px solid #ccc; padding:6px;">Yes</td>
+        <td style="border:1px solid #ccc; padding:6px;">Yes</td>
+        <td style="border:1px solid #ccc; padding:6px;">No</td>
+        <td style="border:1px solid #ccc; padding:6px;">2s</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc; padding:6px;">Radau IIA</td>
+        <td style="border:1px solid #ccc; padding:6px;">No</td>
+        <td style="border:1px solid #ccc; padding:6px;">No</td>
+        <td style="border:1px solid #ccc; padding:6px;">No</td>
+        <td style="border:1px solid #ccc; padding:6px;">2s-1</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc; padding:6px;">Implicit midpoint</td>
+        <td style="border:1px solid #ccc; padding:6px;">Yes</td>
+        <td style="border:1px solid #ccc; padding:6px;">Yes</td>
+        <td style="border:1px solid #ccc; padding:6px;">No</td>
+        <td style="border:1px solid #ccc; padding:6px;">2</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #ccc; padding:6px;">AVF / DG Methods</td>
+        <td style="border:1px solid #ccc; padding:6px;">No</td>
+        <td style="border:1px solid #ccc; padding:6px;">Depends</td>
+        <td style="border:1px solid #ccc; padding:6px;">Yes</td>
+        <td style="border:1px solid #ccc; padding:6px;">2</td>
+      </tr>
+    </table>
+    <figcaption><strong>Table 5.1</strong> – Comparison of geometric properties of key RK-type methods.</figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 5.3.6 -->
+  <h3 id="sec-5-3-6">5.3.6 Summary</h3>
+
+  <ul>
+    <li><strong>Symmetry</strong> guarantees even order and prevents odd-order parasitic terms.</li>
+    <li><strong>Symplecticity</strong> ensures faithful long-time Hamiltonian behaviour.</li>
+    <li><strong>Energy-preserving discrete-gradient</strong> schemes preserve H exactly but generally lose symplecticity.</li>
+    <li><strong>Gauss–Legendre RK</strong> sits at the intersection of symmetry + symplecticity + maximal order.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.3.7 -->
+  <h3 id="sec-5-3-7">5.3.7 References for Section 5.3</h3>
+
+  <ol>
+    <li>Hairer–Lubich–Wanner (2006). <em>Geometric Numerical Integration</em>.</li>
+    <li>Blanes & Casas (2026). <em>Concise Introduction to GNI</em>.</li>
+    <li>Sanz-Serna & Calvo (1994). <em>Numerical Hamiltonian Problems</em>.</li>
+    <li>Quispel, Turner (2010–2021). Discrete gradient methods.</li>
+    <li>Gonzalez (1996–2000). Average Vector Field method and variants.</li>
+  </ol>
+
+</section>
+
+<section id="sec-5-4">
+  <h2>5.4 Partitioned and Symplectic Partitioned Runge–Kutta Methods</h2>
+
+  <p>
+    Many important ODEs have a natural <strong>partitioned structure</strong>.
+    Examples include:
+  </p>
+
+  <ul>
+    <li>Hamiltonian systems with separable Hamiltonians: <span class="math">\(H(p,q)=T(p)+V(q)\)</span></li>
+    <li>Mechanical systems: <span class="math">\(q' = M^{-1}p,\quad p' = -\nabla V(q)\)</span></li>
+    <li>Charged particle dynamics in electromagnetic fields</li>
+    <li>Canonical splitting for Lie–Poisson or multisymplectic PDE discretisations</li>
+  </ul>
+
+  <p>
+    For such systems, <strong>Partitioned Runge–Kutta (PRK)</strong> methods assign 
+    <em>different</em> RK tableaux to each component, while maintaining a coupled update.
+  </p>
+
+  <p>
+    When the system is Hamiltonian, special algebraic conditions give rise to 
+    <strong>Symplectic PRK (SPRK)</strong> methods.
+  </p>
+
+  <hr/>
+
+  <!-- 5.4.1 -->
+  <h3 id="sec-5-4-1">5.4.1 Partitioned ODEs and PRK Schemes</h3>
+
+  <p>
+    Consider a partitioned system:
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+        q' &= f(q,p), \\
+        p' &= g(q,p).
+      \end{aligned}
+    \tag{5.4.1}
+    \]
+  </p>
+
+  <p>
+    A <strong>partitioned Runge–Kutta method</strong> is defined by two tableaux:
+  </p>
+
+  <figure id="fig-5-5" style="text-align:center;">
+    <table style="margin:auto; border-collapse:collapse;">
+      <tr>
+        <td style="padding-right:40px;">
+          <table style="border-collapse:collapse;">
+            <tr><td></td><td><em>A</em></td></tr>
+            <tr><td><em>c</em></td><td></td></tr>
+            <tr><td></td><td><em>b</em></td></tr>
+          </table>
+        </td>
+        <td>
+          <table style="border-collapse:collapse;">
+            <tr><td></td><td><em>Ã</em></td></tr>
+            <tr><td><em>c̃</em></td><td></td></tr>
+            <tr><td></td><td><em>b̃</em></td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <figcaption><strong>Figure 5.5</strong> – A general Partitioned Runge–Kutta pair.</figcaption>
+  </figure>
+
+  <p>
+    The stage values satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+        Q_i &= q_n + h\sum_{j=1}^s a_{ij}\,f(Q_j,P_j), \\
+        P_i &= p_n + h\sum_{j=1}^s \tilde{a}_{ij}\,g(Q_j,P_j),
+      \end{aligned}
+    \tag{5.4.2}
+    \]
+  </p>
+
+  <p>
+    and the step update is:
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+        q_{n+1} &= q_n + h\sum_{i=1}^s b_i\,f(Q_i,P_i), \\
+        p_{n+1} &= p_n + h\sum_{i=1}^s \tilde{b}_i\,g(Q_i,P_i).
+      \end{aligned}
+    \tag{5.4.3}
+    \]
+  </p>
+
+  <hr/>
+
+  <!-- 5.4.2 -->
+  <h3 id="sec-5-4-2">5.4.2 Hamiltonian Structure and SPRK Conditions</h3>
+
+  <p>
+    For a Hamiltonian system in canonical form:
+  </p>
+
+  <p class="math">
+    \[
+      q' = +\nabla_p H(p,q), \qquad
+      p' = -\nabla_q H(p,q),
+    \tag{5.4.4}
+    \]
+  </p>
+
+  <p>
+    the exact flow is symplectic:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^*(dq \wedge dp) = dq \wedge dp.
+    \]
+  </p>
+
+  <p>
+    A partitioned RK method is symplectic if and only if the coefficients satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      b_i \tilde{a}_{ij} + \tilde{b}_j a_{ji} = b_i \tilde{b}_j,
+      \qquad 1\le i,j\le s.
+    \tag{5.4.5}
+    \]
+  </p>
+
+  <p>
+    This is the <strong>symplectic PRK condition</strong>.
+  </p>
+
+  <p>
+    Special cases:
+  </p>
+
+  <ul>
+    <li>
+      If \(A=\tilde{A}\) and \(b=\tilde{b}\), we recover the classical RK symplecticity condition.
+    </li>
+    <li>
+      If \(b=\tilde{b}\) and \(c=\tilde{c}\), then 
+      <span class="math">\(\tilde{a}_{ij}=b_j-a_{ji}\)</span> ensures symplecticity.
+    </li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.4.3 -->
+  <h3 id="sec-5-4-3">5.4.3 Separable Hamiltonians and the SPRK Midpoint Family</h3>
+
+  <p>
+    For separable systems:
+  </p>
+
+  <p class="math">
+    \[
+      H(p,q) = T(p) + V(q),
+    \tag{5.4.6}
+    \]
+  </p>
+
+  <p>
+    the ODE is:
+  </p>
+
+  <p class="math">
+    \[
+      q' = +T_p(p), \qquad p' = -V_q(q).
+    \tag{5.4.7}
+    \]
+  </p>
+
+  <p>
+    Since the two components depend only on one variable each, SPRK methods simplify dramatically.
+  </p>
+
+  <h4>• The Symplectic Euler A/B pair</h4>
+
+  <p>
+    Two 1-stage PRK methods:
+  </p>
+
+  <ul>
+    <li>Euler A: implicit in \(p\)</li>
+    <li>Euler B: implicit in \(q\)</li>
+  </ul>
+
+  Their compositions give:
+  <ul>
+    <li>the classical Stoermer–Verlet method</li>
+    <li>kick–drift–kick and drift–kick–drift forms</li>
+    <li>ubiquitous in molecular dynamics (velocity Verlet), astronomy (leapfrog), plasma physics, etc.</li>
+  </ul>
+
+  <p>
+    Verlet is the most widely used SPRK of order 2.
+  </p>
+
+  <hr/>
+
+  <!-- 5.4.4 -->
+  <h3 id="sec-5-4-4">5.4.4 The Canonical Example: Stoermer–Verlet as a SPRK Method</h3>
+
+  <p>
+    Taking the tableaux:
+  </p>
+
+  <p class="math">
+    \[
+      A = \begin{pmatrix}0\end{pmatrix},\quad b=\begin{pmatrix}1\end{pmatrix},
+      \qquad
+      \tilde{A} = \begin{pmatrix}\frac12\end{pmatrix},\quad
+      \tilde{b}=\begin{pmatrix}1\end{pmatrix},
+    \tag{5.4.8}
+    \]
+  </p>
+
+  <p>
+    yields the scheme:
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+        p_{n+\frac12} &= p_n - \tfrac{h}{2} \nabla V(q_n),\\
+        q_{n+1} &= q_n + h\, \nabla_p T(p_{n+\frac12}),\\
+        p_{n+1} &= p_{n+\frac12} - \tfrac{h}{2} \nabla V(q_{n+1}).
+      \end{aligned}
+    \tag{5.4.9}
+    \]
+  </p>
+
+  <p>
+    This is exactly the Stoermer–Verlet integrator, which is:
+  </p>
+
+  <ul>
+    <li>second order,</li>
+    <li>time symmetric,</li>
+    <li>symplectic,</li>
+    <li>computationally cheap (no solves for separable T),</li>
+    <li>the world’s workhorse Hamiltonian integrator.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.4.5 -->
+  <h3 id="sec-5-4-5">5.4.5 Block Structure, Trees, and Order Conditions</h3>
+
+  <p>
+    PRK order conditions are described by <strong>two-coloured rooted trees</strong>:
+  </p>
+
+  <figure style="text-align:center;" id="fig-5-6">
+    <svg width="420" height="150">
+      <!-- simple two coloured tree -->
+      <circle cx="210" cy="30" r="6" fill="#e00"/> <!-- red = p-tree -->
+      <circle cx="180" cy="80" r="6" fill="#00e"/> <!-- blue = q-tree -->
+      <circle cx="240" cy="80" r="6" fill="#00e"/>
+      <line x1="210" y1="36" x2="180" y2="74" stroke="#333"/>
+      <line x1="210" y1="36" x2="240" y2="74" stroke="#333"/>
+      <text x="210" y="120" text-anchor="middle">Two-coloured rooted tree</text>
+    </svg>
+    <figcaption><strong>Figure 5.6</strong> – A typical order-3 PRK rooted tree.</figcaption>
+  </figure>
+
+  <p>
+    Exactly as in the classical B-series case:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h = y + \sum_{\tau\in \mathcal{T}_{2}} h^{|\tau|}\,\alpha(\tau)\,F(\tau),
+    \tag{5.4.10}
+    \]
+  </p>
+
+  <p>
+    where <span class="math">\(\mathcal{T}_{2}\)</span> is the set of two-coloured rooted trees.
+  </p>
+
+  <p>
+    Using coloured trees splits the order conditions into <strong>mixed</strong> and <strong>diagonal</strong> classes, allowing high-order symmetric & symplectic PRK methods to be constructed systematically.
+  </p>
+
+  <hr/>
+
+  <!-- 5.4.6 -->
+  <h3 id="sec-5-4-6">5.4.6 Higher-Order SPRK Methods</h3>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+    <li>
+      <strong>Yoshida-type compositions</strong> of Verlet  
+      → arbitrary even order
+    </li>
+    <li>
+      <strong>SABA/SBAB families</strong> (Laskar–Robutel)  
+      → highly optimised for celestial mechanics
+    </li>
+    <li>
+      <strong>P-series</strong> and <strong>Q-series</strong> SPRK methods  
+      → systematically derived from coloured-tree order conditions
+    </li>
+  </ul>
+
+  <p>
+    A typical high-order symmetric composition:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h^{(4)} = \Phi_{\gamma_1 h}\circ
+                     \Phi_{\gamma_2 h}\circ
+                     \Phi_{\gamma_1 h},
+    \tag{5.4.11}
+    \]
+  </p>
+
+  <p>
+    with 
+    <span class="math">\(\gamma_1 = 1/(2-2^{1/3})\)</span>,
+    <span class="math">\(\gamma_2 = -2^{1/3}\gamma_1\)</span>.
+  </p>
+
+  <p>
+    Such compositions retain symplecticity and symmetry by construction.
+  </p>
+
+  <hr/>
+
+  <!-- 5.4.7 -->
+  <h3 id="sec-5-4-7">5.4.7 Summary</h3>
+
+  <ul>
+    <li>PRK methods apply different RK tableaux to different components.</li>
+    <li>SPRK methods preserve the canonical symplectic form exactly.</li>
+    <li>SPRK methods arise naturally for separable Hamiltonians.</li>
+    <li>Verlet = SPRK of order 2, symmetric, symplectic, cheap → universal workhorse.</li>
+    <li>Coloured-tree theory gives systematic construction of high-order SPRK schemes.</li>
+    <li>Compositions of symplectic/symmetric PRK methods yield arbitrarily high order.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.4.8 -->
+  <h3 id="sec-5-4-8">5.4.8 References for Section 5.4</h3>
+
+  <ol>
+    <li>Hairer–Lubich–Wanner (2006). <em>Geometric Numerical Integration</em>.</li>
+    <li>Blanes & Casas (2026). <em>Concise Introduction to GNI</em>.</li>
+    <li>Sanz-Serna & Calvo (1994). <em>Numerical Hamiltonian Problems</em>.</li>
+    <li>McLachlan & Quispel (2002–2023). <em>Survey of symplectic splitting & SPRK methods</em>.</li>
+    <li>Laskar & Robutel (2001). <em>SABA/SBAB integrators</em>.</li>
+  </ol>
+
+</section>
+
+<section id="sec-5-5">
+  <h2>5.5 Exponential Runge–Kutta (ERK), Lawson, and Integrating Factor Methods</h2>
+
+  <p>
+    Many evolution equations have the <em>semilinear</em> structure:
+  </p>
+
+  <p class="math">
+    \[
+      y' = Ly + N(y), \qquad y(0)=y_0
+    \tag{5.5.1}
+    \]
+  </p>
+
+  <p>
+    where:
+  </p>
+
+  <ul>
+    <li><strong>L</strong> is a (possibly stiff) linear operator</li>
+    <li><strong>N(y)</strong> is nonlinear but nonstiff</li>
+  </ul>
+
+  <p>
+    Typical examples include:
+  </p>
+
+  <ul>
+    <li>reaction–diffusion PDEs after spatial discretisation</li>
+    <li>Schrödinger and Gross–Pitaevskii equations</li>
+    <li>viscoelasticity and Maxwell–Bloch equations</li>
+    <li>semidiscrete wave/Klein–Gordon systems</li>
+  </ul>
+
+  <p>
+    In such cases, classical RK methods suffer order reduction and stability problems.
+    <strong>Exponential Runge–Kutta (ERK)</strong> and 
+    <strong>integrating factor / Lawson methods</strong> resolve this by 
+    treating <em>the stiff linear part exactly</em>.
+  </p>
+
+  <hr/>
+
+  <!-- 5.5.1 -->
+  <h3 id="sec-5-5-1">5.5.1 The Integrating Factor Transformation</h3>
+
+  <p>
+    The exact flow of the linear part is:
+  </p>
+
+  <p class="math">
+    \[
+      \phi_L^h(y) = e^{hL}y.
+    \]
+  </p>
+
+  <p>
+    Introduce the change of variables:
+  </p>
+
+  <p class="math">
+    \[
+      v(t) = e^{-tL} y(t).
+    \tag{5.5.2}
+    \]
+  </p>
+
+  <p>
+    Then:
+  </p>
+
+  <p class="math">
+    \[
+      v' = e^{-tL}N\!\big(e^{tL}v\big),
+    \tag{5.5.3}
+    \]
+  </p>
+
+  <p>
+    which is <strong>nonstiff</strong> if <span class="math">N</span> is nonstiff.  
+    Ordinary RK applied to <span class="math">v'(t)</span> gives the classical 
+    <strong>Lawson method</strong>.
+  </p>
+
+  <p>
+    This is the foundation of all exponential integrators.
+  </p>
+
+  <hr/>
+
+  <!-- 5.5.2 -->
+  <h3 id="sec-5-5-2">5.5.2 Lawson Methods (Explicit Exponential RK)</h3>
+
+  <p>
+    Apply an s-stage RK method to (5.5.3):
+  </p>
+
+  <p class="math">
+    \[
+      v_{n+1} = v_n 
+      + h\sum_{i=1}^s b_i\,e^{-c_i h L}
+        N\!\big(e^{c_i h L} V_i\big),
+    \tag{5.5.4}
+    \]
+  </p>
+
+  <p>
+    with stages:
+  </p>
+
+  <p class="math">
+    \[
+      V_i = v_n 
+        + h\sum_{j=1}^s a_{ij}\,e^{-c_j h L}
+           N\!\big(e^{c_j hL} V_j\big).
+    \tag{5.5.5}
+    \]
+  </p>
+
+  <p>
+    Return to <span class="math">y</span> via:
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1} = e^{hL} v_{n+1}.
+    \tag{5.5.6}
+    \]
+  </p>
+
+  <p>
+    Advantages:
+  </p>
+
+  <ul>
+    <li>Explicit internal stages (if underlying RK is explicit)</li>
+    <li>Linear part handled exactly → much larger stable steps</li>
+    <li>Ideal for semilinear PDEs with stiff L</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.5.3 -->
+  <h3 id="sec-5-5-3">5.5.3 Exponential Runge–Kutta (ERK): ϕ-Functions</h3>
+
+  <p>
+    ERK methods express the solution using the variation-of-constants formula:
+  </p>
+
+  <p class="math">
+    \[
+      y(t+h)=e^{hL}y(t)
+      +\int_0^h e^{(h-\tau)L} N(y(t+\tau))\,d\tau.
+    \tag{5.5.7}
+    \]
+  </p>
+
+  <p>
+    This integral naturally leads to the <strong>phi functions</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      \varphi_0(z)=e^z,\qquad
+      \varphi_1(z)=\frac{e^z-1}{z},\qquad
+      \varphi_2(z)=\frac{e^z - z - 1}{z^2}, \dots
+    \tag{5.5.8}
+    \]
+  </p>
+
+  <p>
+    Higher-order ERK methods are linear combinations of 
+    <span class="math">\(\varphi_k(hL)\)</span> acting on nonlinear terms.
+  </p>
+
+  <h4>• General s-stage ERK Method</h4>
+
+  <p class="math">
+    \[
+      Y_i = e^{c_i h L} y_n
+            + h\sum_{j=1}^s a_{ij}(hL)\,N(Y_j),
+    \tag{5.5.9}
+    \]
+  </p>
+
+  <p>
+    and
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1} = e^{hL}y_n + 
+        h\sum_{i=1}^s b_i(hL)\,N(Y_i),
+    \tag{5.5.10}
+    \]
+  </p>
+
+  <p>
+    where <strong>the coefficients are matrix functions</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      a_{ij}(hL) = \int_0^{c_i}e^{(c_i-\tau)hL}\ell_j(\tau)\,d\tau,
+    \tag{5.5.11}
+    \]
+  </p>
+
+  <p>
+    and similarly for <span class="math">b_i(hL)</span>.
+  </p>
+
+  <hr/>
+
+  <!-- 5.5.4 -->
+  <h3 id="sec-5-5-4">5.5.4 Geometric Structure of Exponential Integrators</h3>
+
+  <p>
+    If the linear part <span class="math">L</span> generates a symmetry group of the system,  
+    exponential integrators <strong>inherit invariances automatically</strong>:
+  </p>
+
+  <h4>• L skew-symmetric → Norm/energy preservation</h4>
+
+  <p class="math">
+    \[
+      L^T = -L \;\Longrightarrow\; \|e^{hL}y\|=\|y\|.
+    \]
+  </p>
+
+  <h4>• L Hamiltonian → Symplecticity of e<sup>hL</sup></h4>
+
+  <p>
+    If <span class="math">L</span> is a Hamiltonian matrix:
+  </p>
+
+  <p class="math">
+    \[
+      e^{hL} \in \mathrm{Sp}(2n).
+    \tag{5.5.12}
+    \]
+  </p>
+
+  <p>
+    Then exponential integrators preserve linear symplectic structure automatically.
+  </p>
+
+  <h4>• L representing a Lie algebra action → ERK respects group symmetry</h4>
+
+  <p>
+    Example: rotation, Schrödinger flow, Maxwell–Bloch dynamics.
+  </p>
+
+  <hr/>
+
+  <!-- 5.5.5 -->
+  <h3 id="sec-5-5-5">5.5.5 Stability: Why ERK Beats Classical RK</h3>
+
+  <figure id="fig-5-7" style="text-align:center;">
+    <svg width="480" height="220">
+      <!-- axes -->
+      <line x1="40" y1="180" x2="430" y2="180" stroke="#444"/>
+      <line x1="40" y1="180" x2="40" y2="40" stroke="#444"/>
+
+      <!-- RK stability -->
+      <path d="M 40 180 Q 150 120 230 100 T 430 80"
+            stroke="#dd0000" fill="none" stroke-width="3"/>
+      <text x="260" y="130" fill="#d00">Classical RK stability</text>
+
+      <!-- exponential stability -->
+      <path d="M 40 140 Q 180 80 430 60" 
+            stroke="#0088cc" fill="none" stroke-width="3"/>
+      <text x="250" y="90" fill="#08c">ERK stability (nearly optimal)</text>
+    </svg>
+    <figcaption><strong>Figure 5.7</strong> – ERK inherits stability from exact linear flow.</figcaption>
+  </figure>
+
+  <p>
+    Because ERK treats the stiff part exactly, its stability region includes  
+    the entire left half-plane for linear test problems  
+    <span class="math">y' = \lambda y</span> with stiff <span class="math">\(\lambda\)</span>.  
+    This eliminates order reduction for parabolic PDEs.
+  </p>
+
+  <hr/>
+
+  <!-- 5.5.6 -->
+  <h3 id="sec-5-5-6">5.5.6 Relation to Magnus and Splitting Methods</h3>
+
+  <p>
+    ERK is closely linked with:
+  </p>
+
+  <ul>
+    <li><strong>Magnus integrators</strong> (matrix exponentials of nested commutators)</li>
+    <li><strong>Lie–Trotter & Strang splitting</strong></li>
+    <li><strong>Lawson–Magnus hybrids</strong></li>
+    <li><strong>Exponential time differencing (ETD)</strong> methods</li>
+  </ul>
+
+  <p>
+    For stiff linear operators, ERK methods are effectively splitting methods with exact L-flow and approximated nonlinear flow.
+  </p>
+
+  <hr/>
+
+  <!-- 5.5.7 -->
+  <h3 id="sec-5-5-7">5.5.7 Summary</h3>
+
+  <ul>
+    <li>Integrating factor <em>decouples</em> stiff linear and nonlinear dynamics.</li>
+    <li>Lawson methods → explicit exponential RK via change of variables.</li>
+    <li>ERK methods use <var>φ</var>-functions to obtain high-order integrators.</li>
+    <li>They inherit geometric structure if <span class="math">L</span> generates symmetries.</li>
+    <li>Stability is vastly superior for semilinear PDEs.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.5.8 -->
+  <h3 id="sec-5-5-8">5.5.8 References for Section 5.5</h3>
+
+  <ol>
+    <li>Hochbruck & Ostermann (2010), <em>Exponential Integrators</em>.</li>
+    <li>Blanes & Casas (2026), <em>Concise Intro to GNI</em>.</li>
+    <li>Lawson (1967), original integrating factor RK formulation.</li>
+    <li>Cox & Matthews (2002), ETD–RK methods.</li>
+    <li>Iserles (2008–2015), Lawson–Magnus & geometric exponential methods.</li>
+  </ol>
+
+</section>
+
+<section id="sec-5-6">
+  <h2>5.6 Magnus–Runge–Kutta, Commutator-Free Magnus Methods, and Lie–Algebraic Exponential Integrators</h2>
+
+  <p>
+    For <strong>non-autonomous</strong> linear systems
+  </p>
+
+  <p class="math">
+    \[
+      y'(t) = A(t)\, y(t),
+    \tag{5.6.1}
+    \]
+  </p>
+
+  <p>
+    the exact solution is given by a time-ordered exponential:
+  </p>
+
+  <p class="math">
+    \[
+      y(t+h) = \mathcal{T} \exp\!\left(\int_t^{t+h}A(\tau)\,d\tau\right)y(t),
+    \tag{5.6.2}
+    \]
+  </p>
+
+  <p>
+    which lies in the <em>Lie group</em> generated by the Lie algebra containing <span class="math">A(t)</span>.  
+    This structure must be preserved for:
+  </p>
+
+  <ul>
+    <li>quantum evolution (<code>U(t) ∈ U(n)</code>)</li>
+    <li>rigid-body dynamics (<code>R(t) ∈ SO(3)</code>)</li>
+    <li>adjoint equations (<code>M(t) ∈ Sp(2n)</code>)</li>
+    <li>control systems on manifolds</li>
+  </ul>
+
+  <p>
+    This section develops three families of integrators that preserve the Lie-group geometry:
+  </p>
+
+  <ol>
+    <li><strong>Magnus integrators</strong> — exact exponential of a series of commutators.</li>
+    <li><strong>Commutator-free Magnus (CFM)</strong> methods — high-order but exponential-only.</li>
+    <li><strong>Magnus–Runge–Kutta hybrids</strong> — nonlinear / semilinear geometric integrators.</li>
+  </ol>
+
+  <hr/>
+
+  <!-- 5.6.1 -->
+  <h3 id="sec-5-6-1">5.6.1 The Magnus Expansion</h3>
+
+  <p>
+    Magnus (1954) showed that the solution of (5.6.1) can be written exactly as:
+  </p>
+
+  <p class="math">
+    \[
+      y(t+h) = \exp\!\left(\Omega(t,h)\right)y(t),
+    \tag{5.6.3}
+    \]
+  </p>
+
+  <p>
+    where
+  </p>
+
+  <p class="math">
+    \[
+      \Omega(t,h)=\int_t^{t+h}A(\tau)d\tau
+       - \frac12 \int_t^{t+h}\!\!\int_t^{\tau_1}
+          [A(\tau_1),A(\tau_2)]\,d\tau_2 d\tau_1 
+       + \cdots.
+    \tag{5.6.4}
+    \]
+  </p>
+
+  <p>
+    Properties:
+  </p>
+
+  <ul>
+    <li><span class="math">\(\Omega(t,h)\)</span> lies in the same <strong>Lie algebra</strong>.</li>
+    <li><span class="math">\(\exp(\Omega)\)</span> lies in the corresponding <strong>Lie group</strong>.</li>
+    <li>Preserves geometric invariants: unitarity, symplecticity, orthogonality, etc.</li>
+  </ul>
+
+  <h4>Practical truncation:</h4>
+
+  <p>
+    The 2nd-order Magnus method:
+  </p>
+
+  <p class="math">
+    \[
+      \Omega^{[2]} = h\, A(t+\tfrac{h}{2}).
+    \tag{5.6.5}
+    \]
+  </p>
+
+  <p>
+    The 4th-order Magnus method:
+  </p>
+
+  <p class="math">
+    \[
+      \Omega^{[4]} 
+      = h\Big(\tfrac12(A_1+A_2)
+      - \tfrac{\sqrt{3}}{12}h [A_2, A_1]\Big),
+    \tag{5.6.6}
+    \]
+  </p>
+
+  <p>
+    where <span class="math">A_1, A_2</span> are samples at Gauss–Legendre nodes.
+  </p>
+
+  <hr/>
+
+  <!-- 5.6.2 -->
+  <h3 id="sec-5-6-2">5.6.2 Commutator-Free Magnus (CFM) Methods</h3>
+
+  <p>
+    Standard Magnus integrators require evaluating matrix commutators  
+    <span class="math">[A_i, A_j]</span> and nested commutators, which can be expensive.
+  </p>
+
+  <p>
+    <strong>CFM integrators</strong> avoid commutators entirely:  
+    instead of <span class="math">\(\Omega\)</span> being a sum of Lie brackets, we use sums of exponentials:
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1}
+      = 
+      \exp\!\left(h\sum_k \alpha_k A(t_n + c_k h)\right)
+      y_n,
+    \tag{5.6.7}
+    \]
+  </p>
+
+  <p>
+    with coefficients chosen to match the Magnus expansion up to order <span class="math">p</span>.
+  </p>
+
+  <p>
+    Advantages:
+  </p>
+
+  <ul>
+    <li>No commutators → much cheaper for large matrices.</li>
+    <li>No loss of geometric structure.</li>
+    <li>Ideal for quantum dynamics/Schrödinger equations.</li>
+  </ul>
+
+  <h4>Example: 4th-order CFM</h4>
+
+  <p class="math">
+    \[
+      y_{n+1}
+      = 
+      \exp\!\big(h(\tfrac12 A_1 + \tfrac12 A_2)\big)\;
+      y_n,
+    \tag{5.6.8}
+    \]
+  </p>
+
+  <p>
+    with <span class="math">A_1, A_2</span> chosen at Gauss nodes.  
+    No commutators appear, yet the method is 4th order.
+  </p>
+
+  <hr/>
+
+  <!-- 5.6.3 -->
+  <h3 id="sec-5-6-3">5.6.3 Magnus–Runge–Kutta Methods for Nonlinear Systems</h3>
+
+  <p>
+    For semilinear systems:
+  </p>
+
+  <p class="math">
+    \[
+      y' = A(t) y + N(y,t),
+    \tag{5.6.9}
+    \]
+  </p>
+
+  <p>
+    one can combine a Magnus integrator for the linear part  
+    with a Runge–Kutta method for the nonlinear part:
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1}
+      = \exp\!\left(\Omega(t_n,h)\right)
+        \left( 
+          y_n + h\sum_{i=1}^s b_i\, \tilde{N}_i
+        \right),
+    \tag{5.6.10}
+    \]
+  </p>
+
+  <p>
+    where <span class="math">\(\tilde{N}_i\)</span> are nonlinear stages evaluated in a transformed frame:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{N}_i = 
+      N\Big(
+         \exp(\Omega_i)\big(y_n + \cdots\big),\,
+         t_n + c_i h
+      \Big).
+    \tag{5.6.11}
+    \]
+  </p>
+
+  <p>
+    These hybrid methods:
+  </p>
+
+  <ul>
+    <li>are exponential integrators on Lie groups,</li>
+    <li>preserve the geometric structure of the linear flow exactly,</li>
+    <li>handle non-autonomous nonlinearities via RK.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.6.4 -->
+  <h3 id="sec-5-6-4">5.6.4 High-Order Commutator-Free Magnus–RK Methods</h3>
+
+  <p>
+    Blanes, Casas, Iserles, and others developed high-order methods combining:
+  </p>
+
+  <ul>
+    <li>the efficiency of CFM integrators,</li>
+    <li>the flexibility of explicit/implicit RK,</li>
+    <li>structure preservation on Lie groups.</li>
+  </ul>
+
+  <p>
+    A typical 6th-order CFM–RK method uses:
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1}
+      = 
+      \exp\!\left(
+        h(\alpha_1 A_1 + \alpha_2 A_2 + \alpha_3 A_3)
+      \right)
+      \Big(
+        y_n + h\sum b_i N(Y_i)
+      \Big).
+    \tag{5.6.12}
+    \]
+  </p>
+
+  <p>
+    All coefficients arise from matching the Magnus series through order 6, 
+    but <strong>no commutators are used</strong>.
+  </p>
+
+  <hr/>
+
+  <!-- 5.6.5 -->
+  <h3 id="sec-5-6-5">5.6.5 Preservation of Lie-Group Structure</h3>
+
+  <p>
+    If the exact flow satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      y(t) \in G, \qquad G = \exp(\mathfrak{g}),
+    \]
+  </p>
+
+  <p>
+    then Magnus and CFM–RK methods ensure:
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1} = \exp(\xi_n) y_n \in G,
+    \tag{5.6.13}
+    \]
+  </p>
+
+  <p>
+    because <span class="math">\(\xi_n \in \mathfrak{g}\)</span> for all steps.
+  </p>
+
+  <p>
+    Thus:
+  </p>
+
+  <ul>
+    <li>unitarity preserved for Schrödinger problem,</li>
+    <li>orthogonality preserved in rigid-body rotation,</li>
+    <li>symplecticity preserved for linear Hamiltonian systems.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.6.6 -->
+  <h3 id="sec-5-6-6">5.6.6 Summary</h3>
+
+  <ul>
+    <li>The Magnus expansion expresses the exact flow as <em>one exponential</em> in the Lie algebra.</li>
+    <li>Truncations yield high-order geometric integrators.</li>
+    <li>Commutator-free Magnus (CFM) methods remove commutators → highly efficient.</li>
+    <li>Magnus–RK hybrids solve nonlinear/non-autonomous systems geometrically.</li>
+    <li>All methods preserve Lie-group structure: U(n), SO(3), Sp(2n), SU(2), …</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 5.6.7 -->
+  <h3 id="sec-5-6-7">5.6.7 References for Section 5.6</h3>
+
+  <ol>
+    <li>Blanes, Casas, Oteo, & Ros (2009), <em>The Magnus Expansion</em>.</li>
+    <li>Iserles (2008–2022), <em>Lie-group Methods and Magnus Integrators</em>.</li>
+    <li>Blanes & Casas (2026), <em>Concise Intro to GNI</em>.</li>
+    <li>Hochbruck–Ostermann (2010), <em>Exponential Integrators: Review</em>.</li>
+    <li>Alvermann & Fehske (2011), Commutator-free Magnus methods for large quantum systems.</li>
+  </ol>
+
+</section>
+
+<hr />
+<nav style="background:#eee; padding:0.5em; margin-top:1em;">
+    <a href="chapter04.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a href="chapter06.html">Next</a>
+</nav>
+</body>
+
+</html>

@@ -1,0 +1,3258 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 3 - Geometric Numerical Integration</title>
+    <style>
+        body {
+            font-family: serif;
+            line-height: 1.5;
+            margin: 2em;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: Georgia, serif;
+        }
+
+        code {
+            background: #eee;
+            padding: 2px 4px;
+        }
+
+        .task {
+            color: #777;
+            font-style: italic;
+        }
+
+        a {
+            text-decoration: none;
+            color: #006;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>3. Symplectic Integrators for Hamiltonian Systems</h1>
+    <nav style="background:#eee; padding:0.5em; margin-bottom:1em;">
+        <a href="chapter02.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a
+            href="chapter04.html">Next</a>
+    </nav>
+    <hr /><section id="sec-3-1">
+  <h2>3.1 Why Symplectic Integrators?</h2>
+
+  <p>
+    Conventional numerical ODE methods (Runge–Kutta, multistep, etc.) approximate
+    solutions to differential equations with high accuracy over short time
+    intervals.  
+    But for <strong>Hamiltonian systems</strong>, long-time behaviour—not short-time
+    accuracy—is critical.
+  </p>
+
+  <p>
+    Symplectic integrators are designed explicitly to preserve:
+  </p>
+
+  <ul>
+    <li>the symplectic form <span class="math">\(\omega\)</span>,</li>
+    <li>qualitative phase-space geometry,</li>
+    <li>near-conservation of energy over exponentially long time intervals,</li>
+    <li>confinement of trajectories to deformed tori (KAM-like behaviour),</li>
+    <li>momentum maps and invariants under symmetry when combined with reduction.</li>
+  </ul>
+
+  <p>
+    This section explains the <em>fundamental reasons</em> why symplectic integrators
+    dramatically outperform conventional schemes for Hamiltonian dynamics.
+  </p>
+
+  <hr/>
+
+  <!-- 3.1.1 -->
+  <h3 id="sec-3-1-1">3.1.1 Failure of Standard Integrators: Energy Drift</h3>
+
+  <p>
+    Consider a Hamiltonian system
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z} = X_H(z), \qquad H(z) = \text{constant along solutions}.
+    \]
+  </p>
+
+  <p>
+    Standard integrators rarely preserve this exactly.
+    Even if a method has high order, the computed energy \(H(z_n)\) typically
+    satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      H(z_n) = H(z_0) + C h t + \mathcal{O}(h),
+    \]
+  </p>
+
+  <p>
+    showing a <strong>linear drift in time</strong>.
+  </p>
+
+  <h4>Example: explicit Euler</h4>
+
+  <p class="math">
+    \[
+      z_{n+1} = z_n + h X_H(z_n)
+    \]
+  </p>
+
+  <p>
+    Explicit Euler is not symplectic and produces spiralling trajectories even for
+    simple systems like the harmonic oscillator.
+  </p>
+
+  <figure id="fig-3-1" style="text-align:center;">
+    <svg width="420" height="250" style="border:1px solid #ccc;">
+      <text x="10" y="20" font-size="14">Explicit Euler on harmonic oscillator</text>
+
+      <!-- spiralling trajectory -->
+      <g stroke="#c33" fill="none">
+        <path d="M200,125 
+                 m -60,0
+                 a 60,50 0 1,0 120,0
+                 a 55,50 0 1,1 -110,0
+                 a 50,40 0 1,0 100,0
+                 a 45,40 0 1,1 -90,0
+                 a 40,30 0 1,0 80,0
+                 a 35,30 0 1,1 -70,0"
+              stroke-width="2"/>
+      </g>
+
+      <!-- true circle -->
+      <circle cx="200" cy="125" r="60"
+              stroke="#06c" stroke-width="2" fill="none"/>
+
+      <text x="200" y="230" font-size="12" text-anchor="middle">
+        Red: Euler spirals outward (energy ↑).  
+        Blue: true orbit = closed circle.
+      </text>
+    </svg>
+    <figcaption>
+      <strong>Figure 3.1</strong> – Standard methods typically exhibit energy drift.
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 3.1.2 -->
+  <h3 id="sec-3-1-2">3.1.2 What Symplectic Integrators Preserve</h3>
+
+  <p>
+    A numerical map <span class="math">\(\Phi_h: M\to M\)</span> is <strong>symplectic</strong> if:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^* \omega = \omega.
+    \]
+  </p>
+
+  <p>
+    In canonical coordinates, this reads:
+  </p>
+
+  <p class="math">
+    \[
+      (D\Phi_h)^T J (D\Phi_h) = J,
+      \qquad
+      J=\begin{pmatrix}0 & I \\ -I & 0\end{pmatrix}.
+    \]
+  </p>
+
+  <p>
+    Symplectic methods conserve:
+  </p>
+
+  <ul>
+    <li><strong>symplectic form</strong> (exactly),</li>
+    <li><strong>volume</strong> (Liouville theorem),</li>
+    <li><strong>momentum maps</strong> in symmetric systems,</li>
+    <li><strong>qualitative dynamics</strong>: KAM tori, stability, periodicity.</li>
+  </ul>
+
+  <p>
+    But the most striking property involves <strong>backward error analysis</strong>.
+  </p>
+
+  <hr/>
+
+  <!-- 3.1.3 -->
+  <h3 id="sec-3-1-3">3.1.3 Backward Error Analysis: Modified Hamiltonian</h3>
+
+  <p>
+    For symplectic integrators, one can show that:
+  </p>
+
+  <blockquote>
+    <p>
+      <strong>The numerical solution exactly follows the flow of a modified Hamiltonian</strong>
+      <span class="math">\(\tilde{H}\)</span>, where
+      \[
+        \tilde{H} = H + h^p H_{p+1} + h^{p+2} H_{p+2} + \cdots.
+      \]
+    </p>
+  </blockquote>
+
+  <p>
+    This implies:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{H}(z_n) = \tilde{H}(z_0) \quad \text{exactly}.
+    \]
+  </p>
+
+  <p>
+    Therefore, the true energy satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      |H(z_n) - H(z_0)| \le C h^p
+    \]
+  </p>
+
+  <p>
+    for times that grow like:
+  </p>
+
+  <p class="math">
+    \[
+      t = \mathcal{O}(e^{c/h}).
+    \]
+  </p>
+
+  <p>
+    This is an <strong>exponentially long interval of near-conservation</strong> —  
+    a result that no non-symplectic method can match.
+  </p>
+
+  <hr/>
+
+  <!-- 3.1.4 -->
+  <h3 id="sec-3-1-4">3.1.4 KAM Behaviour: Symplectic Methods Preserve Tori</h3>
+
+  <p>
+    For nearly integrable systems,
+    the motion lies on invariant tori (Kolmogorov–Arnold–Moser theory).
+  </p>
+
+  <p>
+    A symplectic integrator maps invariant tori to <em>slightly deformed tori</em>,
+    preserving quasiperiodic structure.
+  </p>
+
+  <p>
+    A non-symplectic method destroys tori, causing:
+  </p>
+
+  <ul>
+    <li>secular energy drift,</li>
+    <li>spurious chaos or false stability,</li>
+    <li>long-time misrepresentation of dynamics.</li>
+  </ul>
+
+  <figure id="fig-3-2" style="text-align:center;">
+    <svg width="450" height="240" style="border:1px solid #ccc;">
+      <text x="120" y="20" font-size="14">Symplectic</text>
+      <text x="330" y="20" font-size="14">Non-symplectic</text>
+
+      <!-- symplectic tori -->
+      <g stroke="#06c" fill="none">
+        <ellipse cx="120" cy="130" rx="70" ry="40" stroke-width="2"/>
+        <ellipse cx="120" cy="130" rx="55" ry="30" stroke-width="2"/>
+        <ellipse cx="120" cy="130" rx="40" ry="20" stroke-width="2"/>
+      </g>
+
+      <!-- non-symplectic distortions -->
+      <g stroke="#c33" fill="none">
+        <path d="M280,130
+                 m -60,0
+                 a 60,45 0 1,0 120,0
+                 a 50,35 0 1,1 -100,0
+                 a 40,25 0 1,0  80,0"
+              stroke-width="2"/>
+      </g>
+    </svg>
+    <figcaption>
+      <strong>Figure 3.2</strong> – Symplectic methods preserve tori; non-symplectic methods distort them.
+    </figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 3.1.5 -->
+  <h3 id="sec-3-1-5">3.1.5 Interactive Demo: Symplectic vs Non-Symplectic Integrators</h3>
+
+  <p>
+    Below is a JavaScript comparison for the harmonic oscillator:
+  </p>
+
+  <ul>
+    <li><strong>Explicit Euler</strong> (non-symplectic)</li>
+    <li><strong>Symplectic Euler</strong> (symplectic)</li>
+  </ul>
+
+  <figure id="fig-3-3" style="text-align:center;">
+    <canvas id="symplecticDemo" width="500" height="260"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.3</strong> –  
+      Red: explicit Euler spirals outward.  
+      Blue: symplectic Euler preserves a deformed ellipse.
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("symplecticDemo");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+
+    const w=canvas.width, h=canvas.height;
+    const cx=w/2, cy=h/2, scale=60;
+
+    let zE=[1,0];   // explicit Euler: (q,p)
+    let zS=[1,0];   // symplectic Euler
+    const hstep=0.05;
+
+    function euler_step(z){
+      // dq = p, dp = -q
+      const q=z[0], p=z[1];
+      return [q+hstep*p, p-hstep*q];
+    }
+
+    function symplectic_euler_step(z){
+      let q=z[0], p=z[1];
+      p = p - hstep*q;      // implicit in p, explicit in q
+      q = q + hstep*p;
+      return [q,p];
+    }
+
+    function proj(z){
+      const [q,p]=z;
+      return [cx + scale*q, cy - scale*p];
+    }
+
+    function draw_point(pt,color){
+      ctx.fillStyle=color;
+      ctx.beginPath();
+      ctx.arc(pt[0],pt[1],3,0,2*Math.PI);
+      ctx.fill();
+    }
+
+    function step_and_draw(){
+      // explicit Euler
+      zE=euler_step(zE);
+      draw_point(proj(zE),"#c33");
+
+      // symplectic Euler
+      zS=symplectic_euler_step(zS);
+      draw_point(proj(zS),"#06c");
+
+      requestAnimationFrame(step_and_draw);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    step_and_draw();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.1.6 -->
+  <h3 id="sec-3-1-6">3.1.6 Summary</h3>
+
+  <p>
+    This section motivates the use of symplectic integrators by explaining:
+  </p>
+
+  <ul>
+    <li>why standard numerical methods fail long-term (energy drift),</li>
+    <li>what symplectic integrators preserve (geometry, tori, invariants),</li>
+    <li>the key fact from backward error analysis: existence of a modified Hamiltonian,</li>
+    <li>KAM-like behaviour and long-time fidelity,</li>
+    <li>clear numerical examples with Euler vs Symplectic Euler.</li>
+  </ul>
+
+  <p>
+    These ideas form the conceptual foundation for the concrete algorithms
+    presented in the remainder of Chapter 3.
+  </p>
+
+  <hr/>
+
+  <!-- 3.1.7 -->
+  <h3 id="sec-3-1-7">3.1.7 References for Section 3.1</h3>
+
+  <ol>
+    <li><strong>[HLW06]</strong>
+      Hairer, Lubich, Wanner.
+      <em>Geometric Numerical Integration</em>, Springer, 2006.</li>
+
+    <li><strong>[BC26]</strong>
+      Blanes &amp; Casas.
+      <em>Concise Introduction to Geometric Numerical Integration</em>, 2nd ed.,
+      CRC Press, 2026.</li>
+
+    <li><strong>[BG94]</strong>
+      Benettin &amp; Giorgilli,
+      “On the Hamiltonian interpolation of near-to-the-identity symplectic maps”,
+      <em>Nonlinearity</em>, 1994.</li>
+
+    <li><strong>[Ske99]</strong>
+      Skeel,
+      “Integration of Hamiltonian systems”,  
+      <em>Handbook of Numerical Analysis</em>, 1999.</li>
+  </ol>
+
+</section>
+
+<section id="sec-3-2">
+  <h2>3.2 Symplectic Euler, Störmer–Verlet, and Basic Symplectic Schemes</h2>
+
+  <p>
+    The simplest symplectic integrators arise from the <strong>splitting</strong> of a separable
+    Hamiltonian
+  </p>
+
+  <p class="math">
+    \[
+      H(q,p) = T(p) + V(q),
+    \]
+  </p>
+
+  <p>
+    where \(T\) is kinetic energy and \(V\) potential energy.  
+    This structure allows the Hamiltonian vector field to be decomposed into two
+    exactly integrable flows: the <em>drift</em> and the <em>kick</em>.
+  </p>
+
+  <p>
+    From these flows one constructs the <strong>Symplectic Euler</strong> (two variants) and the
+    <strong>Störmer–Verlet</strong> (or <strong>Leapfrog</strong>) integrator.
+  </p>
+
+  <p>
+    These are the foundation for higher-order symplectic composition methods
+    introduced later.
+  </p>
+
+  <hr/>
+
+  <!-- 3.2.1 -->
+  <h3 id="sec-3-2-1">3.2.1 Separable Hamiltonians and Exact Splitting</h3>
+
+  <p>
+    For 
+    <span class="math">\(H = T(p) + V(q)\)</span>
+    the Hamiltonian vector field decomposes:
+  </p>
+
+  <p class="math">
+    \[
+      X_H = X_T + X_V.
+    \]
+  </p>
+
+  <p>
+    Their flows are exactly solvable:
+  </p>
+
+  <ul>
+    <li><strong>Drift</strong> (Hamiltonian \(T(p)\)):
+      <span class="math">\(\dot{q} = \nabla_p T(p),\quad \dot{p}=0\)</span></li>
+
+    <li><strong>Kick</strong> (Hamiltonian \(V(q)\)):
+      <span class="math">\(\dot{q} = 0,\quad \dot{p} = -\nabla_q V(q)\)</span></li>
+  </ul>
+
+  <p>
+    The exact time-\(h\) flows are therefore:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_T^h(q,p) = (q + h\,\nabla_p T(p),\, p),
+    \]
+    \[
+      \Phi_V^h(q,p) = (q,\; p - h\,\nabla_q V(q)).
+    \]
+  </p>
+
+  <p>
+    Symplectic integrators are obtained by composing these exact flows.
+  </p>
+
+  <hr/>
+
+  <!-- 3.2.2 -->
+  <h3 id="sec-3-2-2">3.2.2 Symplectic Euler (Two Variants)</h3>
+
+  <p>
+    There are two first-order symplectic Euler methods:
+  </p>
+
+  <h4>(a) Kick–Drift (Euler A)</h4>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+      p_{n+1} &= p_n - h\,\nabla_q V(q_n), \\
+      q_{n+1} &= q_n + h\,\nabla_p T(p_{n+1}).
+      \end{aligned}
+    \]
+  </p>
+
+  <p>
+    This corresponds to:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{\mathrm{A}} = \Phi_T^h \circ \Phi_V^h.
+    \]
+  </p>
+
+  <h4>(b) Drift–Kick (Euler B)</h4>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+      q_{n+1} &= q_n + h\,\nabla_p T(p_n), \\
+      p_{n+1} &= p_n - h\,\nabla_q V(q_{n+1}).
+      \end{aligned}
+    \]
+  </p>
+
+  <p>
+    Corresponding to:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{\mathrm{B}} = \Phi_V^h \circ \Phi_T^h.
+    \]
+  </p>
+
+  <p>
+    Although only first order, these methods:
+  </p>
+
+  <ul>
+    <li>are symplectic,</li>
+    <li>preserve qualitative behaviour,</li>
+    <li>form the building blocks of higher-order methods.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.2.3 -->
+  <h3 id="sec-3-2-3">3.2.3 Störmer–Verlet (Leapfrog) Method</h3>
+
+  <p>
+    The second-order Störmer–Verlet method is obtained by symmetric composition:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi^{\mathrm{SV}}_h
+      = \Phi_T^{h/2} \circ \Phi_V^h \circ \Phi_T^{h/2}.
+    \]
+  </p>
+
+  <p>
+    The update rule is:
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+        p_{n + 1/2} &= p_n - \frac{h}{2}\nabla_q V(q_n), \\
+        q_{n+1} &= q_n + h\,\nabla_p T(p_{n+1/2}), \\
+        p_{n+1} &= p_{n+1/2} - \frac{h}{2}\nabla_q V(q_{n+1}).
+      \end{aligned}
+    \]
+  </p>
+
+  <p>
+    Properties:
+  </p>
+
+  <ul>
+    <li><strong>second order</strong> accurate,</li>
+    <li><strong>time reversible</strong>,</li>
+    <li><strong>symmetric</strong>,</li>
+    <li><strong>symplectic</strong>,</li>
+    <li>near-perfect long-time energy behaviour.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.2.4 -->
+  <h3 id="sec-3-2-4">3.2.4 Geometric Interpretation via Exact Flows</h3>
+
+  <figure id="fig-3-4" style="text-align:center;">
+    <svg width="480" height="260" style="border:1px solid #ccc;">
+      <text x="10" y="20" font-size="14">
+        Composition of Drift (T) and Kick (V)
+      </text>
+
+      <!-- Drift arrow -->
+      <line x1="140" y1="130" x2="260" y2="130"
+            stroke="#06c" stroke-width="3"
+            marker-end="url(#arrSV)"/>
+      <text x="200" y="115" text-anchor="middle" font-size="12">Drift</text>
+
+      <!-- Kick arrow -->
+      <line x1="260" y1="130" x2="260" y2="60"
+            stroke="#c33" stroke-width="3"
+            marker-end="url(#arrSV)"/>
+      <text x="265" y="95" font-size="12">Kick</text>
+
+      <defs>
+        <marker id="arrSV" markerWidth="12" markerHeight="12"
+                refX="5" refY="6" orient="auto">
+          <path d="M0,0 L0,12 L12,6 z" fill="#333"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>
+      <strong>Figure 3.4</strong> –  
+      Symplectic integrators are compositions of exact Hamiltonian flows.
+    </figcaption>
+  </figure>
+
+  <p>
+    Since each subflow is symplectic, the composed method is symplectic.
+  </p>
+
+  <hr/>
+
+  <!-- 3.2.5 -->
+  <h3 id="sec-3-2-5">3.2.5 Interactive Demo: Störmer–Verlet vs Symplectic Euler vs Euler</h3>
+
+  <p>
+    Below, we integrate the harmonic oscillator with:
+  </p>
+
+  <ul>
+    <li>Explicit Euler (non-symplectic)</li>
+    <li>Symplectic Euler</li>
+    <li>Störmer–Verlet</li>
+  </ul>
+
+  <figure id="fig-3-5" style="text-align:center;">
+    <canvas id="verletDemo" width="520" height="270"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.5</strong> –  
+      Red: Euler (spiral).  
+      Blue: Symplectic Euler (deformed ellipse).  
+      Green: Verlet (nearly perfect closed curve).
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("verletDemo");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+    const cx=w/2, cy=h/2, S=70;
+    const hstep=0.05;
+
+    let zE=[1,0];    // Euler
+    let zS=[1,0];    // Symplectic Euler
+    let zV=[1,0];    // Verlet
+
+    function stepEuler(z){
+      const q=z[0], p=z[1];
+      return [q+hstep*p, p-hstep*q];
+    }
+
+    function stepSymplecticEuler(z){
+      let q=z[0], p=z[1];
+      p = p - hstep*q;
+      q = q + hstep*p;
+      return [q,p];
+    }
+
+    function stepVerlet(z){
+      let q=z[0], p=z[1];
+      p -= 0.5*hstep*q;
+      q += hstep*p;
+      p -= 0.5*hstep*q;
+      return [q,p];
+    }
+
+    function proj(z){ return [cx + S*z[0], cy - S*z[1]]; }
+
+    function plot(pt,color){
+      ctx.fillStyle=color;
+      ctx.beginPath(); ctx.arc(pt[0],pt[1],2,0,2*Math.PI); ctx.fill();
+    }
+
+    function animate(){
+      zE=stepEuler(zE);
+      zS=stepSymplecticEuler(zS);
+      zV=stepVerlet(zV);
+
+      plot(proj(zE),"#c00");
+      plot(proj(zS),"#06c");
+      plot(proj(zV),"#0a0");
+
+      requestAnimationFrame(animate);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.2.6 -->
+  <h3 id="sec-3-2-6">3.2.6 Summary</h3>
+
+  <p>
+    This section developed the simplest—and most fundamental—symplectic
+    integrators:
+  </p>
+
+  <ul>
+    <li>Symplectic Euler A and B (first order),</li>
+    <li>Störmer–Verlet / Leapfrog (second order),</li>
+    <li>all derived via exact flow splitting,</li>
+    <li>all symplectic, volume-preserving, and geometrically faithful.</li>
+  </ul>
+
+  <p>
+    These schemes constitute the backbone of geometric integration, molecular
+    dynamics, celestial mechanics, HMC (Hamiltonian Monte Carlo), and quantum
+    simulation splitting methods.
+  </p>
+
+  <hr/>
+
+  <!-- 3.2.7 -->
+  <h3 id="sec-3-2-7">3.2.7 References for Section 3.2</h3>
+
+  <ol>
+    <li><strong>[HLW06]</strong>
+      Hairer, Lubich, Wanner,
+      <em>Geometric Numerical Integration</em>, Springer.</li>
+
+    <li><strong>[BC26]</strong>
+      Blanes &amp; Casas,
+      <em>Concise Introduction to Geometric Numerical Integration</em>,
+      CRC Press, 2026.</li>
+
+    <li><strong>[For90]</strong>
+      Forest &amp; Ruth,
+      “Fourth-order symplectic integration in classical mechanics”,
+      <em>Physica D</em>, 1990.</li>
+
+    <li><strong>[Ske99]</strong>
+      Skeel,
+      “Integration of Hamiltonian systems”,  
+      <em>Handbook of Numerical Analysis</em>, 1999.</li>
+  </ol>
+
+</section>
+
+<section id="sec-3-3">
+  <h2>3.3 Variational Integrators and Discrete Lagrangian Mechanics</h2>
+
+  <p>
+    Symplectic Euler and Störmer–Verlet can be obtained in many ways:
+  </p>
+
+  <ul>
+    <li>as compositions of exact flows (splitting),</li>
+    <li>as symplectic Runge–Kutta methods,</li>
+    <li>as <strong>variational integrators</strong> from a discrete action principle.</li>
+  </ul>
+
+  <p>
+    The variational viewpoint is particularly elegant: one discretises the
+    <strong>action integral</strong> rather than the differential equations.
+    The resulting numerical method is automatically:
+  </p>
+
+  <ul>
+    <li>symplectic,</li>
+    <li>momentum-preserving (Noether),</li>
+    <li>time-reversible (for symmetric discretisations),</li>
+    <li>well-suited for constrained and reduced systems.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.3.1 -->
+  <h3 id="sec-3-3-1">3.3.1 Continuous Lagrangian Mechanics</h3>
+
+  <p>
+    Let \(Q\) be the configuration manifold and \(L: TQ \to \mathbb{R}\)
+    the Lagrangian, typically
+  </p>
+
+  <p class="math">
+    \[
+      L(q,\dot{q}) = T(q,\dot{q}) - V(q).
+    \]
+  </p>
+
+  <p>
+    The action of a curve \(q:[t_0,t_1]\to Q\) is
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{S}[q] = \int_{t_0}^{t_1} L\big(q(t),\dot{q}(t)\big)\,dt.
+    \]
+  </p>
+
+  <p>
+    Hamilton’s principle states that the actual trajectory satisfies
+  </p>
+
+  <p class="math">
+    \[
+      \delta \mathcal{S}[q] = 0
+    \]
+  </p>
+
+  <p>
+    for variations \(\delta q\) vanishing at the endpoints. This yields the
+    <strong>Euler–Lagrange equations</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt}\frac{\partial L}{\partial \dot{q}}
+      - \frac{\partial L}{\partial q} = 0.
+    \]
+  </p>
+
+  <p>
+    For a mechanical Lagrangian \(L = \tfrac{1}{2}\dot{q}^{\mathsf T}M\dot{q}-V(q)\),
+    this is equivalent to Hamilton’s equations after a Legendre transform.
+  </p>
+
+  <hr/>
+
+  <!-- 3.3.2 -->
+  <h3 id="sec-3-3-2">3.3.2 Discrete Lagrangians and the Discrete Action</h3>
+
+  <p>
+    We now discretise time:
+  </p>
+
+  <p class="math">
+    \[
+      t_k = t_0 + k h, \qquad k = 0,\dots,N.
+    \]
+  </p>
+
+  <p>
+    A <strong>discrete Lagrangian</strong> is a function
+  </p>
+
+  <p class="math">
+    \[
+      L_d : Q\times Q \to \mathbb{R},
+    \]
+  </p>
+
+  <p>
+    intended as an approximation to the exact action along the true trajectory
+    joining \(q_k\) and \(q_{k+1}\):
+  </p>
+
+  <p class="math">
+    \[
+      L_d(q_k,q_{k+1})
+      \approx \int_{t_k}^{t_{k+1}} L\big(q(t),\dot{q}(t)\big)\,dt.
+    \]
+  </p>
+
+  <p>
+    The <strong>discrete action</strong> is defined as the sum over all segments:
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{S}_d[q_0,\dots,q_N]
+      = \sum_{k=0}^{N-1} L_d(q_k,q_{k+1}).
+    \]
+  </p>
+
+  <p>
+    Discrete Hamilton’s principle:
+  </p>
+
+  <blockquote>
+    <p>
+      A discrete trajectory \((q_k)_{k=0}^N\) is a solution if
+      \(\mathcal{S}_d\) is stationary with respect to variations of
+      \(q_1,\dots,q_{N-1}\) with fixed endpoints \(q_0,q_N\).
+    </p>
+  </blockquote>
+
+  <hr/>
+
+  <!-- 3.3.3 -->
+  <h3 id="sec-3-3-3">3.3.3 Discrete Euler–Lagrange Equations</h3>
+
+  <p>
+    Vary \(\mathcal{S}_d\) with respect to \(q_k\) for \(1 \le k \le N-1\).  
+    Each \(q_k\) appears only in \(L_d(q_{k-1},q_k)\) and \(L_d(q_k,q_{k+1})\):
+  </p>
+
+  <p class="math">
+    \[
+      \delta\mathcal{S}_d
+      = \sum_{k=1}^{N-1}
+        \Big(
+          D_2 L_d(q_{k-1},q_k)
+          + D_1 L_d(q_k,q_{k+1})
+        \Big)\cdot \delta q_k,
+    \]
+  </p>
+
+  <p>
+    where \(D_1\) and \(D_2\) denote partial derivatives with respect to the
+    first and second argument.
+  </p>
+
+  <p>
+    Stationarity for all \(\delta q_k\) yields the 
+    <strong>discrete Euler–Lagrange equations</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      D_2 L_d(q_{k-1},q_k)
+      + D_1 L_d(q_k,q_{k+1}) = 0,
+      \qquad k=1,\dots,N-1.
+    \]
+  </p>
+
+  <p>
+    If the mixed derivative \(D_{12}^2 L_d\) is nondegenerate, these equations
+    implicitly define an update map \((q_{k-1},q_k)\mapsto(q_k,q_{k+1})\).
+  </p>
+
+  <hr/>
+
+  <!-- 3.3.4 -->
+  <h3 id="sec-3-3-4">3.3.4 Discrete Legendre Transform and Symplecticity</h3>
+
+  <p>
+    Define discrete momenta via the <strong>discrete Legendre transforms</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      p_k^- := - D_1 L_d(q_k,q_{k+1}), \qquad
+      p_k^+ := D_2 L_d(q_{k-1},q_k).
+    \]
+  </p>
+
+  <p>
+    The discrete Euler–Lagrange equation is exactly
+  </p>
+
+  <p class="math">
+    \[
+      p_k^- = p_k^+.
+    \]
+  </p>
+
+  <p>
+    Hence we simply write \(p_k := p_k^- = p_k^+\) and obtain an update rule
+    \((q_k,p_k) \mapsto (q_{k+1},p_{k+1})\).
+  </p>
+
+  <p>
+    A key theorem:
+  </p>
+
+  <blockquote>
+    <strong>Theorem 3.1 (Symplecticity of Variational Integrators).</strong>
+    The map \((q_k,p_k)\mapsto(q_{k+1},p_{k+1})\) defined by the discrete
+    Euler–Lagrange equations is symplectic with respect to the canonical
+    symplectic form on \(T^*Q\).
+  </blockquote>
+
+  <p>
+    Proof (outline): view the discrete action as a generating function of type I,
+    and show that the pullback of the canonical 1-form by the update map differs
+    by an exact form, implying preservation of the symplectic 2-form.
+  </p>
+
+  <hr/>
+
+  <!-- 3.3.5 -->
+  <h3 id="sec-3-3-5">3.3.5 Example: Störmer–Verlet from a Discrete Lagrangian</h3>
+
+  <p>
+    Consider a mechanical Lagrangian (mass matrix \(M\) constant, for simplicity):
+  </p>
+
+  <p class="math">
+    \[
+      L(q,\dot{q}) = \frac{1}{2}\dot{q}^{\mathsf T}M\dot{q} - V(q).
+    \]
+  </p>
+
+  <p>
+    A natural <strong>second-order accurate</strong> discrete Lagrangian:
+  </p>
+
+  <p class="math">
+    \[
+      L_d(q_k,q_{k+1})
+      =
+      h\,L\left(
+        \frac{q_k+q_{k+1}}{2},
+        \frac{q_{k+1}-q_k}{h}
+      \right).
+    \]
+  </p>
+
+  <p>
+    Compute:
+  </p>
+
+  <p class="math">
+    \[
+      D_1 L_d(q_k,q_{k+1})
+      = -M\,\frac{q_{k+1}-q_k}{h}
+        -\frac{h}{2}\nabla V\!\left(\frac{q_k+q_{k+1}}{2}\right),
+    \]
+    \[
+      D_2 L_d(q_k,q_{k+1})
+      = M\,\frac{q_{k+1}-q_k}{h}
+        -\frac{h}{2}\nabla V\!\left(\frac{q_k+q_{k+1}}{2}\right).
+    \]
+  </p>
+
+  <p>
+    Discrete Euler–Lagrange:
+  </p>
+
+  <p class="math">
+    \[
+      D_2 L_d(q_{k-1},q_k) + D_1 L_d(q_k,q_{k+1}) = 0
+    \]
+  </p>
+
+  <p>
+    yields (after rearrangement) the familiar <strong>Störmer–Verlet</strong> scheme.
+    In the simplest case \(M=I\) and using equivalent algebra, one recovers:
+  </p>
+
+  <p class="math">
+    \[
+      q_{k+1} - 2q_k + q_{k-1}
+      = - h^2 \nabla V(q_k),
+    \]
+  </p>
+
+  <p>
+    which is the position form of the Verlet method.
+  </p>
+
+  <hr/>
+
+  <!-- 3.3.6 -->
+  <h3 id="sec-3-3-6">3.3.6 Discrete Noether’s Theorem</h3>
+
+  <p>
+    Suppose a Lie group \(G\) acts on \(Q\) and leaves the discrete Lagrangian
+    invariant:
+  </p>
+
+  <p class="math">
+    \[
+      L_d(g\cdot q_k, g\cdot q_{k+1}) = L_d(q_k,q_{k+1}),
+      \qquad \forall g\in G.
+    \]
+  </p>
+
+  <p>
+    Then there exists a <strong>discrete momentum map</strong> \(J_d\) such that the
+    discrete flow preserves \(J_d\):
+  </p>
+
+  <p class="math">
+    \[
+      J_d(q_{k},q_{k+1}) = J_d(q_{k-1},q_k).
+    \]
+  </p>
+
+  <p>
+    This is the <strong>discrete analogue of Noether’s theorem</strong>.
+    In particular:
+  </p>
+
+  <ul>
+    <li>translational invariance ⇒ discrete linear momentum conservation,</li>
+    <li>rotational invariance ⇒ discrete angular momentum conservation.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.3.7 -->
+  <h3 id="sec-3-3-7">3.3.7 Interactive Demo: Discrete Lagrangian Oscillator</h3>
+
+  <p>
+    For the harmonic oscillator with
+  </p>
+
+  <p class="math">
+    \[
+      L(q,\dot{q}) = \tfrac{1}{2}\dot{q}^2 - \tfrac{1}{2}\omega^2 q^2,
+    \]
+  </p>
+
+  <p>
+    the Verlet position update is
+  </p>
+
+  <p class="math">
+    \[
+      q_{k+1} - 2q_k + q_{k-1} = -h^2\omega^2 q_k.
+    \]
+  </p>
+
+  <p>
+    Below we iterate this scheme and plot phase space \((q_k,\dot{q}_k)\)
+    approximated by \(\dot{q}_k \approx (q_{k+1}-q_{k-1})/(2h)\).
+  </p>
+
+  <figure id="fig-3-6" style="text-align:center;">
+    <canvas id="varIntOsc" width="520" height="270"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.6</strong> –  
+      Verlet as a variational integrator for the harmonic oscillator.
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("varIntOsc");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+    const cx=w/2, cy=h/2, S=70;
+    const hstep=0.05, omega=1.0;
+
+    let q_prev=1.0;
+    let q_curr=1.0 - 0.5*hstep*hstep*omega*omega*q_prev; // one backward step
+
+    function verlet_step(qm,q){
+      return 2*q - qm - hstep*hstep*omega*omega*q;
+    }
+
+    function proj(q,dq){
+      return [cx + S*q, cy - S*dq];
+    }
+
+    function draw_pt(pt){
+      ctx.fillStyle="#0a0";
+      ctx.beginPath(); ctx.arc(pt[0],pt[1],2,0,2*Math.PI); ctx.fill();
+    }
+
+    function animate(){
+      const q_next=verlet_step(q_prev,q_curr);
+      const dq = (q_next - q_prev)/(2*hstep);
+      draw_pt(proj(q_curr,dq));
+      q_prev=q_curr; q_curr=q_next;
+      requestAnimationFrame(animate);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.3.8 -->
+  <h3 id="sec-3-3-8">3.3.8 Summary</h3>
+
+  <p>
+    Variational integrators arise from a discrete action principle and inherit:
+  </p>
+
+  <ul>
+    <li>symplecticity (via discrete Legendre transform),</li>
+    <li>momentum conservation (via discrete Noether),</li>
+    <li>good long-time energy behaviour,</li>
+    <li>a direct link to continuous Lagrangian mechanics.</li>
+  </ul>
+
+  <p>
+    Störmer–Verlet is a prime example, providing a unifying viewpoint that
+    connects splitting, variational, and Hamiltonian perspectives.
+  </p>
+
+  <hr/>
+
+  <!-- 3.3.9 -->
+  <h3 id="sec-3-3-9">3.3.9 References for Section 3.3</h3>
+
+  <ol>
+    <li><strong>[MW01]</strong>
+      J.E. Marsden &amp; M. West,
+      “Discrete mechanics and variational integrators”,
+      <em>Acta Numerica</em>, 2001.</li>
+
+    <li><strong>[HLW06]</strong>
+      E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration</em>, Springer, 2006.</li>
+
+    <li><strong>[BC26]</strong>
+      S. Blanes &amp; F. Casas,
+      <em>Concise Introduction to Geometric Numerical Integration</em>, 2nd ed.,
+      CRC Press, 2026.</li>
+
+    <li><strong>[Lew03]</strong>
+      J. Simo, N. Tarnow, K. Wong,  
+      “Exact energy-momentum conserving algorithms and symplectic schemes for non-linear dynamics”,
+      various references summarised in  
+      J.E. Marsden &amp; T.S. Ratiu, <em>Introduction to Mechanics and Symmetry</em>.</li>
+  </ol>
+
+</section>
+
+<section id="sec-3-4">
+  <h2>3.4 Splitting Methods and Composition Techniques</h2>
+
+  <p>
+    Splitting methods are among the most fundamental geometric integrators,
+    applicable to Hamiltonian, Poisson, Lie–Poisson, and PDE systems.
+    They are constructed by decomposing the vector field or operator into
+    subproblems with <strong>exactly computable flows</strong>.
+  </p>
+
+  <p>
+    This section explains:
+  </p>
+
+  <ul>
+    <li>the algebraic foundation of operator splitting,</li>
+    <li>Lie–Trotter and Strang splittings,</li>
+    <li>the Baker–Campbell–Hausdorff (BCH) structure,</li>
+    <li>higher-order compositions (Yoshida, Suzuki, Kahan–Li, Blanes–Moan),</li>
+    <li>symmetry, reversibility, and order conditions.</li>
+  </ul>
+
+  <p>
+    These techniques generalise Störmer–Verlet to arbitrary Hamiltonian or
+    non-Hamiltonian systems.
+  </p>
+
+  <hr/>
+
+  <!-- 3.4.1 -->
+  <h3 id="sec-3-4-1">3.4.1 Operator Splitting: Basic Idea</h3>
+
+  <p>
+    Consider an ODE:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z} = (A + B)z,
+    \]
+  </p>
+
+  <p>
+    where \(A\) and \(B\) are vector fields (or linear operators).
+    If the flows
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_A^t = e^{tA},\qquad \Phi_B^t = e^{tB}
+    \]
+  </p>
+
+  <p>
+    are easily computed, then the flow of the sum is approximated by composing
+    \(\Phi_A^t\) and \(\Phi_B^t\).
+  </p>
+
+  <p>
+    The <strong>Lie–Trotter splitting</strong> is:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_{A+B}^h
+      \approx \Phi_A^h \circ \Phi_B^h,
+    \]
+  </p>
+
+  <p>
+    which is first-order accurate.
+  </p>
+
+  <hr/>
+
+  <!-- 3.4.2 -->
+  <h3 id="sec-3-4-2">3.4.2 Baker–Campbell–Hausdorff (BCH) Expansion</h3>
+
+  <p>
+    The error of splitting is governed by the <strong>BCH formula</strong>.
+    For noncommuting operators:
+  </p>
+
+  <p class="math">
+    \[
+      e^{hA}e^{hB}
+      = 
+      \exp\left(
+        h(A+B) + \frac{h^2}{2}[A,B]
+        + \frac{h^3}{12}[A,[A,B]]
+        - \frac{h^3}{12}[B,[A,B]]
+        + \cdots
+      \right).
+    \]
+  </p>
+
+  <p>
+    Key consequences:
+  </p>
+
+  <ul>
+    <li>Lie–Trotter is first order because error starts at \(h^2\),</li>
+    <li>Strang is second order because odd commutators cancel,</li>
+    <li>higher-order compositions require cancelling many commutators.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.4.3 -->
+  <h3 id="sec-3-4-3">3.4.3 Strang Splitting (Symmetric Second-Order)</h3>
+
+  <p>
+    A symmetric composition gives second order:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_{A+B}^h
+      \approx \Phi_A^{h/2}\circ\Phi_B^h\circ\Phi_A^{h/2}.
+    \]
+  </p>
+
+  <p>
+    Because the composition is symmetric:
+  </p>
+
+  <p class="math">
+    \[
+      S_h^{-1} = S_{-h},
+    \]
+  </p>
+
+  <p>
+    all odd BCH terms cancel, yielding second-order accuracy.
+  </p>
+
+  <p>
+    The Störmer–Verlet method is exactly the Strang splitting for a separable
+    Hamiltonian \(H=T(p)+V(q)\).
+  </p>
+
+  <hr/>
+
+  <!-- 3.4.4 -->
+  <h3 id="sec-3-4-4">3.4.4 Higher-Order Composition Methods</h3>
+
+  <p>
+    To obtain order \(p>2\), one composes several Strang splittings:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h 
+      = S_{\gamma_1 h}\circ S_{\gamma_2 h}\circ\cdots\circ S_{\gamma_s h},
+    \]
+  </p>
+
+  <p>
+    where the coefficients \(\gamma_i\) must satisfy nonlinear algebraic
+    <strong>order conditions</strong>.
+  </p>
+
+  <p>
+    Well-known families:
+  </p>
+
+  <ul>
+    <li><strong>Yoshida (1990)</strong>: real coefficients, order 4,6,8,…</li>
+    <li><strong>Suzuki</strong> fractal compositions</li>
+    <li><strong>Kahan–Li</strong> minimal stages for a given order</li>
+    <li><strong>Blanes–Moan</strong> optimal 4th/6th order methods (low error constants)</li>
+  </ul>
+
+  <h4>Example: Yoshida 4th-order composition</h4>
+
+  <p class="math">
+    \[
+      \Psi_h^{(4)}
+      = S_{\alpha h}\circ S_{\beta h}\circ S_{\alpha h},
+    \]
+  </p>
+
+  <p>
+    where:
+  </p>
+
+  <p class="math">
+    \[
+      \alpha = \frac{1}{2 - 2^{1/3}},\qquad
+      \beta  = 1 - 2\alpha.
+    \]
+  </p>
+
+  <p>
+    This cancels BCH error terms up to order \(h^4\).
+  </p>
+
+  <hr/>
+
+  <!-- 3.4.5 -->
+  <h3 id="sec-3-4-5">3.4.5 Negative and Complex Coefficients</h3>
+
+  <p>
+    Higher-order splitting methods require some coefficients \(\gamma_i\) to be:
+  </p>
+
+  <ul>
+    <li>negative (implies reversing flows),</li>
+    <li>or complex with positive real part (for PDE stability).</li>
+  </ul>
+
+  <p>
+    Real composition methods of order > 2 must contain negative coefficients  
+    (Sheng–Suzuki no-go theorem).  
+    Complex-coefficient methods can achieve:
+  </p>
+
+  <ul>
+    <li>high order,</li>
+    <li>all \(\Re(\gamma_i) > 0\) (no backward flow),</li>
+    <li>applications to Schrödinger, diffusion, and parabolic PDEs.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.4.6 -->
+  <h3 id="sec-3-4-6">3.4.6 Geometric Properties of Composition Schemes</h3>
+
+  <p>
+    If the basic method \(S_h\) is:
+  </p>
+
+  <ul>
+    <li>symplectic → compositions are symplectic,</li>
+    <li>time-reversible → symmetric compositions preserve reversibility,</li>
+    <li>momentum-preserving → compositions preserve invariants,</li>
+    <li>volume-preserving → compositions preserve volume.</li>
+  </ul>
+
+  <p>
+    This follows because the properties are preserved under composition and
+    inversion.
+  </p>
+
+  <hr/>
+
+  <!-- 3.4.7 -->
+  <h3 id="sec-3-4-7">3.4.7 Interactive Demo: Strang vs Yoshida (4th Order)</h3>
+
+  <p>
+    We compare Strang splitting (2nd order) versus Yoshida 4th order
+    on the harmonic oscillator. Strang produces a deformed ellipse;
+    Yoshida produces a nearly perfect ellipse.
+  </p>
+
+  <figure id="fig-3-7" style="text-align:center;">
+    <canvas id="yoshidaDemo" width="520" height="270"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.7</strong> –  
+      Blue: Strang (2nd order).  
+      Green: Yoshida 4th order (much smaller distortion).
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("yoshidaDemo");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+    const cx=w/2, cy=h/2, S=70;
+    const hstep=0.1;
+
+    // Basic flows
+    function flowT(q,p,dt){ return [q + dt*p, p]; }
+    function flowV(q,p,dt){ return [q, p - dt*q]; }
+
+    function strang(q,p,dt){
+      [q,p]=flowT(q,p,dt/2);
+      [q,p]=flowV(q,p,dt);
+      [q,p]=flowT(q,p,dt/2);
+      return [q,p];
+    }
+
+    // Yoshida 4th order coefficients
+    const a = 1/(2 - Math.cbrt(2));
+    const b = 1 - 2*a;
+
+    function yoshida4(q,p,dt){
+      [q,p]=strang(q,p,a*dt);
+      [q,p]=strang(q,p,b*dt);
+      [q,p]=strang(q,p,a*dt);
+      return [q,p];
+    }
+
+    let zS=[1,0];
+    let zY=[1,0];
+
+    function project([q,p]){
+      return [cx + S*q, cy - S*p];
+    }
+
+    function plot(pt,color){
+      ctx.fillStyle=color;
+      ctx.beginPath(); ctx.arc(pt[0],pt[1],2,0,2*Math.PI); ctx.fill();
+    }
+
+    function animate(){
+      zS=strang(zS[0],zS[1],hstep);
+      zY=yoshida4(zY[0],zY[1],hstep);
+
+      plot(project(zS),"#06c");
+      plot(project(zY),"#0a0");
+
+      requestAnimationFrame(animate);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.4.8 -->
+  <h3 id="sec-3-4-8">3.4.8 Summary</h3>
+
+  <p>
+    Splitting and composition techniques provide a powerful framework for
+    constructing symplectic, volume-preserving, and structure-preserving
+    integrators of arbitrary order.
+  </p>
+
+  <ul>
+    <li>Lie–Trotter: first order</li>
+    <li>Strang: second order, symmetric</li>
+    <li>Yoshida/Suzuki/Kahan–Li/Blanes–Moan: 4th–8th order</li>
+    <li>complex-coefficient compositions avoid negative time steps</li>
+  </ul>
+
+  <p>
+    These methods underpin modern geometric integration for:
+  </p>
+
+  <ul>
+    <li>Hamiltonian systems,</li>
+    <li>Schrödinger equations,</li>
+    <li>molecular dynamics,</li>
+    <li>HMC (Hamiltonian Monte Carlo),</li>
+    <li>quantum simulation via Trotter–Suzuki decompositions.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.4.9 -->
+  <h3 id="sec-3-4-9">3.4.9 References for Section 3.4</h3>
+
+  <ol>
+    <li><strong>[BC26]</strong>
+      Blanes &amp; Casas, <em>Concise Introduction to Geometric Numerical Integration</em>, 2nd ed., CRC Press, 2026.</li>
+
+    <li><strong>[HLW06]</strong>
+      Hairer, Lubich &amp; Wanner, <em>Geometric Numerical Integration</em>, Springer.</li>
+
+    <li><strong>[Yos90]</strong>
+      Yoshida, “Construction of higher order symplectic integrators,” <em>Phys. Lett. A</em>, 1990.</li>
+
+    <li><strong>[Suz90]</strong>
+      Suzuki, “Fractal decompositions of exponential operators,” <em>Phys. Lett. A</em>, 1990.</li>
+
+    <li><strong>[BLM02]</strong>
+      Blanes, Casas, &amp; Moan, “Symplectic integrators with processing: optimised composition methods,” <em>SIAM J. Sci. Comput.</em></li>
+  </ol>
+
+</section>
+
+<section id="sec-3-5">
+  <h2>3.5 Backward Error Analysis and Modified Equations</h2>
+
+  <p>
+    Traditional error analysis estimates the difference between a numerical
+    solution and the exact flow of the original differential equation.
+    This yields useful short-time bounds but fails to explain the remarkable
+    <strong>long-time stability</strong> of structure-preserving (especially symplectic)
+    integrators.
+  </p>
+
+  <p>
+    <strong>Backward error analysis (BEA)</strong> takes the opposite perspective:
+  </p>
+
+  <blockquote>
+    <p>
+      Instead of asking: “How far is the numerical solution from the true
+      solution of the original ODE?”,  
+      BEA asks:  
+      “Is the numerical solution the <em>exact</em> solution of a <strong>nearby</strong>
+      differential equation?”
+    </p>
+  </blockquote>
+
+  <p>
+    This leads to the concept of a <strong>modified (or shadow) differential equation</strong>.
+    For symplectic methods applied to Hamiltonian systems, the modified equation
+    is itself Hamiltonian with a <em>modified Hamiltonian</em>.
+  </p>
+
+  <p>
+    This yields exponentially accurate energy conservation for exponentially long
+    times, and explains the preservation of quasiperiodic motion, tori, and other
+    qualitative features.
+  </p>
+
+  <hr/>
+
+  <!-- 3.5.1 -->
+  <h3 id="sec-3-5-1">3.5.1 Exponential Map of Vector Fields and Formal Series</h3>
+
+  <p>
+    Consider an ODE
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z} = f(z),
+    \]
+  </p>
+
+  <p>
+    and a one-step numerical integrator \(\Phi_h\).
+    If \(\Phi_h\) is smooth in \(h\), one may formally write
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h = \exp(h F_h),
+    \]
+  </p>
+
+  <p>
+    where \(F_h\) is a formal power series of differential operators:
+  </p>
+
+  <p class="math">
+    \[
+      F_h = f + h f_1 + h^2 f_2 + h^3 f_3 + \cdots.
+    \]
+  </p>
+
+  <p>
+    This defines the <strong>modified vector field</strong>.
+  </p>
+
+  <p>
+    Truncating at order \(h^N\) gives a modified ODE that the method integrates
+    exactly up to errors of order \(h^{N+1}\).
+  </p>
+
+  <hr/>
+
+  <!-- 3.5.2 -->
+  <h3 id="sec-3-5-2">3.5.2 BCH Formula and Modified Vector Fields</h3>
+
+  <p>
+    For splitting methods, the BCH formula gives explicit modified equations.
+    Example for Strang splitting of \(\dot{z}=(A+B)z\):
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h = e^{\frac{h}{2}A} e^{hB} e^{\frac{h}{2}A}
+      = \exp\left(
+         h(A+B)
+         + \frac{h^3}{24}([A,[A,B]] - [B,[A,B]])
+         + \mathcal{O}(h^5)
+      \right).
+    \]
+  </p>
+
+  <p>
+    Thus the modified vector field is:
+  </p>
+
+  <p class="math">
+    \[
+      F_h = A + B 
+            + \frac{h^2}{24}\big([A,[A,B]] - [B,[A,B]]\big)
+            + \mathcal{O}(h^4).
+    \]
+  </p>
+
+  <p>
+    Higher-order terms involve nested commutators;  
+    symbolic or automatic computation is standard in modern implementations.
+  </p>
+
+  <hr/>
+
+  <!-- 3.5.3 -->
+  <h3 id="sec-3-5-3">3.5.3 Modified Hamiltonians for Symplectic Integrators</h3>
+
+  <p>
+    For a symplectic integrator applied to a Hamiltonian system
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z} = X_H(z),
+    \]
+  </p>
+
+  <p>
+    the modified vector field is also Hamiltonian:
+  </p>
+
+  <p class="math">
+    \[
+      F_h = X_{\tilde{H}},
+    \]
+  </p>
+
+  <p>
+    with the <strong>modified Hamiltonian</strong>
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{H}
+        = H
+        + h^p H_{p+1}
+        + h^{p+2} H_{p+2}
+        + \cdots.
+    \]
+  </p>
+
+  <p>
+    This follows from:
+  </p>
+
+  <ul>
+    <li>symplecticity of the numerical map,</li>
+    <li>the fact that symplectic maps near the identity are exponentials of Hamiltonian vector fields.</li>
+  </ul>
+
+  <p>
+    Since symplectic maps satisfy
+  </p>
+
+  <p class="math">
+    \[
+      (\Phi_h)^*\omega = \omega,
+    \]
+  </p>
+
+  <p>
+    \(\Phi_h\) lies in the Lie group of canonical transformations whose Lie algebra
+    consists of Hamiltonian vector fields.
+  </p>
+
+  <hr/>
+
+  <!-- 3.5.4 -->
+  <h3 id="sec-3-5-4">3.5.4 Exponentially Long Near-Conservation of Energy</h3>
+
+  <p>
+    Since \(\tilde{H}\) is exactly preserved:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{H}(z_n) = \tilde{H}(z_0),
+    \]
+  </p>
+
+  <p>
+    and the difference between \(H\) and \(\tilde{H}\) is small:
+  </p>
+
+  <p class="math">
+    \[
+      |\tilde{H}(z) - H(z)| \le C h^p,
+    \]
+  </p>
+
+  <p>
+    the true energy exhibits only small, bounded oscillations:
+  </p>
+
+  <p class="math">
+    \[
+      |H(z_n) - H(z_0)| \le C h^p
+    \]
+  </p>
+
+  <p>
+    for times up to:
+  </p>
+
+  <p class="math">
+    \[
+      t = \mathcal{O}(e^{c / h}),
+    \]
+  </p>
+
+  <p>
+    an <strong>exponentially long</strong> interval.
+  </p>
+
+  <p>
+    No non-symplectic method exhibits this property.
+  </p>
+
+  <hr/>
+
+  <!-- 3.5.5 -->
+  <h3 id="sec-3-5-5">3.5.5 Modified Frequency Analysis for the Harmonic Oscillator</h3>
+
+  <p>
+    For the harmonic oscillator:
+  </p>
+
+  <p class="math">
+    \[
+      H = \frac{1}{2}(p^2 + \omega^2 q^2),
+    \]
+  </p>
+
+  <p>
+    symplectic Euler and Verlet modify \(\omega\) to a nearby \(\tilde{\omega}\),
+    explaining the slight deformation of the ellipse in phase space.
+  </p>
+
+  <p>
+    Example for Verlet:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{\omega}
+      = \frac{1}{h}\arccos\left(1 - \frac{h^2\omega^2}{2}\right)
+      = \omega + \frac{\omega^3 h^2}{24} + \mathcal{O}(h^4).
+    \]
+  </p>
+
+  <p>
+    So Verlet is exactly periodic with period \(2\pi/\tilde{\omega}\).
+  </p>
+
+  <hr/>
+
+  <!-- 3.5.6 -->
+  <h3 id="sec-3-5-6">3.5.6 Backward Error for PDE Splittings</h3>
+
+  <p>
+    For PDEs (e.g. Schrödinger, diffusion–advection, Vlasov–Poisson), splitting
+    methods correspond to Trotter–Suzuki decompositions of linear or nonlinear
+    operators.
+  </p>
+
+  <p>
+    The modified PDE typically contains commutators of differential operators:
+  </p>
+
+  <p class="math">
+    \[
+      [\mathcal{A},\mathcal{B}]
+      = \mathcal{A}\mathcal{B} - \mathcal{B}\mathcal{A}.
+    \]
+  </p>
+
+  <p>
+    The same cancellation logic applies:
+  </p>
+
+  <ul>
+    <li>Strang splitting cancels odd commutators → 2nd order,</li>
+    <li>higher-order composition methods cancel more commutators,</li>
+    <li>complex coefficients useful for parabolic (dissipative) PDEs.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.5.7 -->
+  <h3 id="sec-3-5-7">3.5.7 Interactive Illustration: Modified Energy Oscillation</h3>
+
+  <p>
+    Below we simulate energy evolution of:
+  </p>
+
+  <ul>
+    <li>Explicit Euler (non-symplectic) — linear energy drift</li>
+    <li>Symplectic Euler — bounded oscillation</li>
+    <li>Verlet — almost perfectly bounded oscillation</li>
+  </ul>
+
+  <figure id="fig-3-8" style="text-align:center;">
+    <canvas id="beaEnergyDemo" width="520" height="270"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.8</strong> –  
+      Energy drift (red), vs oscillatory bounded energy (blue, green).
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("beaEnergyDemo");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+
+    const hstep=0.1;
+    const omega=1;
+    function H(q,p){ return 0.5*(p*p + omega*omega*q*q); }
+
+    let zE=[1,0];
+    let zS=[1,0];
+    let zV=[1,0];
+
+    let t=0;
+
+    function stepEuler([q,p]){
+      return [q + hstep*p, p - hstep*q];
+    }
+    function stepSymplectic([q,p]){
+      p = p - hstep*q;
+      q = q + hstep*p;
+      return [q,p];
+    }
+    function stepVerlet([q,p]){
+      p = p - 0.5*hstep*q;
+      q = q + hstep*p;
+      p = p - 0.5*hstep*q;
+      return [q,p];
+    }
+
+    function animate(){
+      t += hstep;
+
+      zE=stepEuler(zE);
+      zS=stepSymplectic(zS);
+      zV=stepVerlet(zV);
+
+      const HE=H(zE[0],zE[1]);
+      const HS=H(zS[0],zS[1]);
+      const HV=H(zV[0],zV[1]);
+
+      const x = t;
+      const yE = h - HE*0.03;
+      const yS = h*0.5 - HS*0.03;
+      const yV = h*0.8 - HV*0.03;
+
+      ctx.fillStyle="#c00"; ctx.fillRect(x, yE, 2,2);
+      ctx.fillStyle="#06c"; ctx.fillRect(x, yS, 2,2);
+      ctx.fillStyle="#0a0"; ctx.fillRect(x, yV, 2,2);
+
+      if (x < w) requestAnimationFrame(animate);
+    }
+    ctx.clearRect(0,0,w,h);
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.5.8 -->
+  <h3 id="sec-3-5-8">3.5.8 Summary</h3>
+
+  <p>
+    Backward error analysis explains the extraordinary long-time fidelity of
+    structure-preserving methods:
+  </p>
+
+  <ul>
+    <li>Every symplectic integrator corresponds to the exact flow of a modified Hamiltonian.</li>
+    <li>Energy is nearly conserved for exponentially long times.</li>
+    <li>Phase-space structures (tori, invariant sets) persist under modified dynamics.</li>
+    <li>BCH expansions reveal the structure of modified equations.</li>
+    <li>Splitting methods have computable modified vector fields.</li>
+    <li>BEA extends naturally to PDE operator splittings.</li>
+  </ul>
+
+  <p>
+    This provides the theoretical core for Hamiltonian Monte Carlo, molecular
+    dynamics, symplectic PDE solvers, and high-order geometric integrators.
+  </p>
+
+  <hr/>
+
+  <!-- 3.5.9 -->
+  <h3 id="sec-3-5-9">3.5.9 References for Section 3.5</h3>
+
+  <ol>
+    <li><strong>[HLW06]</strong>
+      Hairer, Lubich &amp; Wanner,
+      <em>Geometric Numerical Integration</em>, Springer, 2006.</li>
+
+    <li><strong>[BC26]</strong>
+      Blanes &amp; Casas,
+      <em>Concise Introduction to Geometric Numerical Integration</em>, CRC Press, 2026.</li>
+
+    <li><strong>[BG94]</strong>
+      Benettin &amp; Giorgilli,
+      “On the Hamiltonian interpolation of symplectic maps,”
+      <em>Nonlinearity</em>, 1994.</li>
+
+    <li><strong>[LR04]</strong>
+      Lubich &amp; Reich,
+      “Backward error analysis for numerical integrators,”
+      in <em>Handbook of Numerical Analysis</em>, Vol. X, 2004.</li>
+  </ol>
+
+</section>
+
+<section id="sec-3-6">
+  <h2>3.6 Symmetric Methods, Processing, and Modified Flow Techniques</h2>
+
+  <p>
+    Symmetry plays an essential role in geometric integration.
+    A numerical method is <strong>symmetric</strong>
+    (or <strong>time-reversible</strong>) if its inverse is obtained by flipping the sign
+    of the time step:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{-1} = \Phi_{-h}.
+    \]
+  </p>
+
+  <p>
+    Symmetric integrators have error expansions containing only <strong>odd</strong>
+    powers of \(h\), giving them “free” advantages:
+  </p>
+
+  <ul>
+    <li>improved long-time accuracy,</li>
+    <li>automatic cancellation of even-order error terms,</li>
+    <li>excellent energy behaviour,</li>
+    <li>compatibility with backward error analysis (modified Hamiltonians).</li>
+  </ul>
+
+  <p>
+    Moreover, <strong>processing</strong> (conjugation by a near-identity map)
+    allows a low-order method to behave like a high-order one, without additional
+    cost per step. This is widely used in molecular dynamics and celestial
+    mechanics.
+  </p>
+
+  <hr/>
+
+  <!-- 3.6.1 -->
+  <h3 id="sec-3-6-1">3.6.1 Symmetric Integrators</h3>
+
+  <p>
+    A numerical integrator \(\Phi_h\) is symmetric if:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h = \Phi_{-h}^{-1}.
+    \]
+  </p>
+
+  <p>
+    Equivalently:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_{-h} = \Phi_h^{-1}.
+    \]
+  </p>
+
+  <p>
+    Example: the <strong>Strang splitting</strong> for \(A+B\)
+  </p>
+
+  <p class="math">
+    \[
+      S_h = e^{\frac{h}{2}A} e^{hB} e^{\frac{h}{2}A}
+    \]
+  </p>
+
+  <p>
+    satisfies:
+  </p>
+
+  <p class="math">
+    \[
+      S_h^{-1} = S_{-h}.
+    \]
+  </p>
+
+  <p>
+    This symmetry forces the modified vector field to contain only odd powers:
+  </p>
+
+  <p class="math">
+    \[
+      F_h = A+B + h^2 E_3 + h^4 E_5 + \cdots.
+    \]
+  </p>
+
+  <p>
+    Thus a symmetric method of order \(p\) actually behaves like an order
+    \(p+1\) method over long times (when \(p\) is even), thanks to the absence of
+    even-order error terms.
+  </p>
+
+  <hr/>
+
+  <!-- 3.6.2 -->
+  <h3 id="sec-3-6-2">3.6.2 Composition and Symmetry</h3>
+
+  <p>
+    Compose a method with its adjoint:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^* := (\Phi_h)^{-1}|_{h\mapsto -h}.
+    \]
+  </p>
+
+  <p>
+    A simple composition:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h = \Phi_{a h} \circ \Phi_{b h}^*,
+    \]
+  </p>
+
+  <p>
+    is symmetric if \(a=b\).
+  </p>
+
+  <p>
+    In general, if the sequence of coefficients \(\{a_i\}\) is <em>palindromic</em>:
+  </p>
+
+  <p class="math">
+    \[
+      (a_1,a_2,\dots,a_s,a_s,\dots,a_2,a_1),
+    \]
+  </p>
+
+  <p>
+    then the resulting method is symmetric.
+  </p>
+
+  <p>
+    This is used in:
+  </p>
+
+  <ul>
+    <li>Yoshida-type methods,</li>
+    <li>processing via adjoint compositions,</li>
+    <li>high-order geometric schemes for Hamiltonian Monte Carlo.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.6.3 -->
+  <h3 id="sec-3-6-3">3.6.3 Processing (Conjugation) Techniques</h3>
+
+  <p>
+    The central idea:
+  </p>
+
+  <blockquote>
+    <strong>
+      A low-order integrator can often be conjugated by a near-identity map to
+      produce an integrator of much higher effective order.
+    </strong>
+  </blockquote>
+
+  <p>
+    Let \(\Phi_h\) be any integrator and let \(P_h\) be a near-identity map (the
+    <strong>processor</strong>).
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h := P_h^{-1} \circ \Phi_h \circ P_h.
+    \]
+  </p>
+
+  <p>
+    Properties:
+  </p>
+
+  <ul>
+    <li>\(\Psi_h\) is conjugate to \(\Phi_h\) ⇒ same stability,</li>
+    <li>Symplecticness preserved if \(P_h\) is symplectic,</li>
+    <li>Order can increase dramatically,</li>
+    <li>Cost per step is unchanged: \(P_h\) only applied once at start/end.</li>
+  </ul>
+
+  <p>
+    The modified vector fields transform as:
+  </p>
+
+  <p class="math">
+    \[
+      e^{hF_h^\Psi} = e^{-G_h} e^{hF_h} e^{G_h},
+    \]
+  </p>
+
+  <p>
+    with \(G_h\) corresponding to the generator of \(P_h\).
+  </p>
+
+  <p>
+    Suitable choice of \(G_h\) cancels many low-order error terms.
+  </p>
+
+  <hr/>
+
+  <!-- 3.6.4 -->
+  <h3 id="sec-3-6-4">3.6.4 Example: Processed Verlet</h3>
+
+  <p>
+    Let \(\Phi_h^{\mathrm{SV}}\) be the Verlet method.  
+    One can design a processor:
+  </p>
+
+  <p class="math">
+    \[
+      P_h = \exp(h^2 G),
+    \]
+  </p>
+
+  <p>
+    such that the processed method:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h = P_h^{-1}\circ \Phi_h^{\mathrm{SV}} \circ P_h
+    \]
+  </p>
+
+  <p>
+    has a modified Hamiltonian:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{H}_\Psi = H + h^4 K + \mathcal{O}(h^6),
+    \]
+  </p>
+
+  <p>
+    even though the unprocessed Verlet method has error terms at order \(h^2\).
+  </p>
+
+  <p>
+    That is, processed Verlet becomes a <strong>fourth-order method in terms of
+    phase accuracy</strong> for very little cost.
+  </p>
+
+  <hr/>
+
+  <!-- 3.6.5 -->
+  <h3 id="sec-3-6-5">3.6.5 Modified Flow Methods</h3>
+
+  <p>
+    The modified flow is:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z} = F_h(z).
+    \]
+  </p>
+
+  <p>
+    One may integrate a truncated version:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z} = f(z) + h^p f_{p+1}(z),
+    \]
+  </p>
+
+  <p>
+    where \(f_{p+1}\) is computed symbolically or automatically.
+  </p>
+
+  <p>
+    This can dramatically reduce global error (similar to Richardson or
+    extrapolation), but is more compatible with geometric integration because
+    the added term preserves (in Hamiltonian case) the symplectic structure.
+  </p>
+
+  <hr/>
+
+  <!-- 3.6.6 -->
+  <h3 id="sec-3-6-6">3.6.6 Interactive Visualization: Processing Effect</h3>
+
+  <p>
+    Below we illustrate phase-space trajectories of:
+  </p>
+
+  <ul>
+    <li>plain Verlet (2nd order),</li>
+    <li>processed Verlet (4th order effective accuracy).</li>
+  </ul>
+
+  <figure id="fig-3-9" style="text-align:center;">
+    <canvas id="procVerlet" width="520" height="270"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.9</strong> –  
+      Processed Verlet yields a nearly perfect ellipse,  
+      far less distorted than standard Verlet.
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("procVerlet");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+    const cx=w/2, cy=h/2, S=70;
+    const hstep = 0.15;
+    const omega=1.0;
+
+    function H(q,p){ return 0.5*(p*p + omega*omega*q*q); }
+
+    // Standard Verlet
+    function verlet([q,p]){
+      p -= 0.5*hstep*q;
+      q += hstep*p;
+      p -= 0.5*hstep*q;
+      return [q,p];
+    }
+
+    // Simple processing: apply a small correction proportional to h^2
+    function process([q,p],sign){
+      // naive illustrative processor
+      const alpha = 0.05*hstep*hstep;
+      return [ q + sign*alpha*p, p - sign*alpha*q ];
+    }
+
+    let zV = process([1,0],+1);    // processed initial state
+    let zU = [1,0];                // unprocessed Verlet
+
+    function project([q,p]){
+      return [cx + S*q, cy - S*p];
+    }
+
+    function draw(pt,color){
+      ctx.fillStyle=color;
+      ctx.beginPath(); ctx.arc(pt[0],pt[1],2,0,2*Math.PI); ctx.fill();
+    }
+
+    function animate(){
+      // Unprocessed
+      zU = verlet(zU);
+      draw(project(zU),"#c33");
+
+      // Processed version: inverse process after step
+      zV = verlet(zV);
+      let zp = process(zV,-1);
+      draw(project(zp),"#0a0");
+
+      requestAnimationFrame(animate);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.6.7 -->
+  <h3 id="sec-3-6-7">3.6.7 Summary</h3>
+
+  <p>
+    In this section we established:
+  </p>
+
+  <ul>
+    <li>Symmetric (time-reversible) integrators cancel even-order error terms.</li>
+    <li>Symmetric compositions yield higher accuracy with fewer commutators.</li>
+    <li>Processing (conjugation) upgrades low-order methods to high effective order.</li>
+    <li>Processed Verlet is widely used in molecular dynamics for its excellent performance.</li>
+    <li>Modified flows allow controlled introduction of higher-order accuracy.</li>
+  </ul>
+
+  <p>
+    Symmetry + processing are two of the most powerful engineering ideas in geometric integration.
+  </p>
+
+  <hr/>
+
+  <!-- 3.6.8 -->
+  <h3 id="sec-3-6-8">3.6.8 References for Section 3.6</h3>
+
+  <ol>
+    <li><strong>[HLW06]</strong> Hairer, Lubich, Wanner, <em>Geometric Numerical Integration</em>, Springer.</li>
+    <li><strong>[BC26]</strong> Blanes &amp; Casas, <em>Concise Introduction to Geometric Numerical Integration</em>, CRC Press, 2026.</li>
+    <li><strong>[Ske99]</strong> Skeel, “Integration of Hamiltonian systems,” <em>Handbook of Numerical Analysis</em>, 1999.</li>
+    <li><strong>[BLM02]</strong> Blanes, Casas, Moan, “Optimized processed integrators.”</li>
+    <li><strong>[McLachlan–Quispel 2002]</strong> “Splitting methods,” <em>Acta Numerica</em>.</li>
+  </ol>
+
+</section>
+
+<section id="sec-3-7">
+  <h2>3.7 Symplectic Runge–Kutta and Partitioned Runge–Kutta Methods</h2>
+
+  <p>
+    Runge–Kutta (RK) methods form a very large and flexible family of numerical
+    integrators for ODEs.  
+    For Hamiltonian and symplectic problems, certain RK methods possess the
+    remarkable property of being <strong>symplectic</strong>, meaning they exactly
+    preserve the canonical symplectic form.
+  </p>
+
+  <p>
+    The most important examples are:
+  </p>
+
+  <ul>
+    <li><strong>Gauss–Legendre collocation RK methods</strong> – implicit, high-order, symplectic;</li>
+    <li><strong>symplectic Partitioned RK (PRK)</strong> methods – ideal for separable Hamiltonians;</li>
+    <li>connections to <strong>variational integrators</strong> and <strong>discrete action principles</strong>.</li>
+  </ul>
+
+  <p>
+    These methods play a fundamental role in modern geometric integration,
+    especially in achieving arbitrarily high order while preserving symplectic
+    structure and long-time fidelity.
+  </p>
+
+  <hr/>
+
+  <!-- 3.7.1 -->
+  <h3 id="sec-3-7-1">3.7.1 General Runge–Kutta Methods</h3>
+
+  <p>
+    For the ODE \(\dot{z} = f(z)\), an \(s\)-stage RK method has the form:
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+      Z_i &= z_n + h\sum_{j=1}^{s}a_{ij} f(Z_j), \qquad i=1,\dots,s, \\
+      z_{n+1} &= z_n + h\sum_{i=1}^{s}b_i f(Z_i).
+      \end{aligned}
+    \]
+  </p>
+
+  <p>
+    The coefficients \((a_{ij}, b_i, c_i)\) define the method and are often
+    expressed in a Butcher tableau:
+  </p>
+
+  <figure id="fig-3-10" style="text-align:center;">
+    <pre style="display:inline-block; border:1px solid #ccc; padding:10px;">
+c₁ | a₁₁  a₁₂ ... a₁ₛ
+c₂ | a₂₁  a₂₂ ... a₂ₛ
+⋮  |  ⋮    ⋮  ⋱   ⋮
+cₛ | aₛ₁  aₛ₂ ... aₛₛ
+---|---------------------
+    | b₁    b₂  ...  bₛ
+    </pre>
+    <figcaption><strong>Figure 3.10</strong> – Butcher tableau for an s-stage RK method.</figcaption>
+  </figure>
+
+  <hr/>
+
+  <!-- 3.7.2 -->
+  <h3 id="sec-3-7-2">3.7.2 Symplecticity Conditions for Runge–Kutta Methods</h3>
+
+  <p>
+    A Runge–Kutta method is <strong>symplectic</strong> if and only if its coefficients satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      b_i a_{ij} + b_j a_{ji} = b_i b_j, \qquad \forall i,j.
+    \]
+  </p>
+
+  <p>
+    This is a deep condition derived from preservation of the canonical
+    2-form:
+  </p>
+
+  <p class="math">
+    \[
+      \omega = dq\wedge dp.
+    \]
+  </p>
+
+  <p>
+    Consequences include:
+  </p>
+
+  <ul>
+    <li>Implicit midpoint is symplectic,</li>
+    <li>Gauss–Legendre collocation methods are symplectic,</li>
+    <li>No explicit RK method can be symplectic (for Hamiltonian systems).</li>
+  </ul>
+
+  <p>
+    The constraint essentially says:  
+    A symplectic RK method must be implicit.
+  </p>
+
+  <hr/>
+
+  <!-- 3.7.3 -->
+  <h3 id="sec-3-7-3">3.7.3 Gauss–Legendre Collocation Methods</h3>
+
+  <p>
+    Consider the collocation method where the stage values satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{z}(t_n + c_i h) = f(Z_i),
+    \]
+  </p>
+
+  <p>
+    and where the collocation points \(c_i\) are the Gauss–Legendre points on
+    \([0,1]\).  
+    These produce:
+  </p>
+
+  <ul>
+    <li>order \(2s\) with \(s\) stages (optimal for implicit RK),</li>
+    <li>symplecticity,</li>
+    <li>A-stability,</li>
+    <li>excellent long-time preservation of invariants.</li>
+  </ul>
+
+  <p>
+    The 1-stage Gauss method is the implicit midpoint rule:
+  </p>
+
+  <p class="math">
+    \[
+      z_{n+1} = z_n + h f\!\left(\frac{z_n + z_{n+1}}{2}\right).
+    \]
+  </p>
+
+  <p>
+    It is symplectic, second order, symmetric, and fundamental.
+  </p>
+
+  <hr/>
+
+  <!-- 3.7.4 -->
+  <h3 id="sec-3-7-4">3.7.4 Geometric Interpretation of Gauss Methods</h3>
+
+  <p>
+    Gauss–Legendre methods can be interpreted as:
+  </p>
+
+  <ul>
+    <li><strong>symplectic collocation</strong> at Gaussian quadrature nodes,</li>
+    <li>a <strong>variational integrator</strong> derived from discrete action minimisation,</li>
+    <li>a <strong>canonical transformation</strong> with excellent backward error properties.</li>
+  </ul>
+
+  <p>
+    Their modified Hamiltonian \(\tilde{H}\) has unusually small error constants,
+    leading to:
+  </p>
+
+  <ul>
+    <li>near-exact phase accuracy,</li>
+    <li>near-conservation of energy over astronomical time spans,</li>
+    <li>usefulness in high-precision astrodynamics and quantum simulation.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.7.5 -->
+  <h3 id="sec-3-7-5">3.7.5 Partitioned Runge–Kutta (PRK) Methods</h3>
+
+  <p>
+    For separable Hamiltonian systems:
+  </p>
+
+  <p class="math">
+    \[
+      H(q,p) = T(p) + V(q),
+    \]
+  </p>
+
+  <p>
+    PRK methods apply different Butcher tableaux to the \(q\) and \(p\)
+    components:
+  </p>
+
+  <p class="math">
+    \[
+      \begin{aligned}
+      Q_i &= q_n + h\sum_j a_{ij}^{(q)} p_j,\\
+      P_i &= p_n - h\sum_j a_{ij}^{(p)} \nabla V(Q_j),\\
+      q_{n+1} &= q_n + h\sum_i b_i^{(q)} P_i,\\
+      p_{n+1} &= p_n - h\sum_i b_i^{(p)} \nabla V(Q_i).
+      \end{aligned}
+    \]
+  </p>
+
+  <p>
+    Symplecticity requires:
+  </p>
+
+  <p class="math">
+    \[
+      b_i^{(q)} a_{ij}^{(p)} + b_j^{(p)} a_{ji}^{(q)}
+      = b_i^{(q)} b_j^{(p)}.
+    \]
+  </p>
+
+  <p>
+    Many well-known integrators (e.g. ‘velocity Verlet’) are PRK methods.
+  </p>
+
+  <hr/>
+
+  <!-- 3.7.6 -->
+  <h3 id="sec-3-7-6">3.7.6 Symplectic RK and Hamiltonian PDEs</h3>
+
+  <p>
+    Symplectic RK and PRK methods are widely used in:
+  </p>
+
+  <ul>
+    <li>nonlinear Schrödinger (split-step + RK),</li>
+    <li>Vlasov–Poisson,</li>
+    <li>Lagrangian particle methods for fluids,</li>
+    <li>quantum control and Schrödinger–Poisson systems.</li>
+  </ul>
+
+  <p>
+    The Gauss–Legendre methods are especially effective for:
+  </p>
+
+  <ul>
+    <li>Hamiltonian PDE semi-discretisations,</li>
+    <li>symplectic spectral methods,</li>
+    <li>high-order geometric time integration.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.7.7 -->
+  <h3 id="sec-3-7-7">3.7.7 Interactive Demo: Implicit Midpoint vs Explicit RK</h3>
+
+  <p>
+    Below we compare:
+  </p>
+
+  <ul>
+    <li>explicit RK4 (not symplectic),</li>
+    <li>implicit midpoint (symplectic).</li>
+  </ul>
+
+  <p>
+    The harmonic oscillator shows energy drift for RK4  
+    and near-perfect bounded energy for midpoint.
+  </p>
+
+  <figure id="fig-3-11" style="text-align:center;">
+    <canvas id="rkDemo" width="520" height="270"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.11</strong> – RK4 energy drift (blue) vs midpoint bounded energy (green).</figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("rkDemo");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+
+    const hstep=0.05, omega=1;
+    function f([q,p]){ return [p, -q]; }
+
+    // RK4
+    let z4=[1,0];
+    function rk4(z){
+      const k1=f(z);
+      const k2=f([z[0]+0.5*hstep*k1[0], z[1]+0.5*hstep*k1[1]]);
+      const k3=f([z[0]+0.5*hstep*k2[0], z[1]+0.5*hstep*k2[1]]);
+      const k4=f([z[0]+hstep*k3[0], z[1]+hstep*k3[1]]);
+      return [
+        z[0] + hstep*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
+        z[1] + hstep*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6
+      ];
+    }
+
+    // Implicit midpoint (fixed-point iteration)
+    let zM=[1,0];
+    function midpoint(z){
+      let q=z[0], p=z[1];
+      let qm=q, pm=p;
+      for(let iter=0; iter<4; iter++){
+        const f1=[pm, -qm];
+        qm = q + 0.5*hstep*f1[0];
+        pm = p + 0.5*hstep*f1[1];
+      }
+      return [q + hstep*pm, p - hstep*qm];
+    }
+
+    let t=0;
+    function H(z){ return 0.5*(z[0]*z[0]+z[1]*z[1]); }
+
+    function animate(){
+      t+=hstep;
+      z4=rk4(z4);
+      zM=midpoint(zM);
+
+      const x=t;
+      const y4 = h - H(z4)*0.06;
+      const yM = h*0.5 - H(zM)*0.06;
+
+      ctx.fillStyle="#06c"; ctx.fillRect(x,y4,2,2);
+      ctx.fillStyle="#0a0"; ctx.fillRect(x,yM,2,2);
+
+      if(x<w) requestAnimationFrame(animate);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.7.8 -->
+  <h3 id="sec-3-7-8">3.7.8 Summary</h3>
+
+  <p>
+    This section established:
+  </p>
+
+  <ul>
+    <li>Runge–Kutta methods can be symplectic if they satisfy special algebraic constraints.</li>
+    <li>No explicit RK method is symplectic for Hamiltonian systems.</li>
+    <li>Gauss–Legendre collocation methods are high-order, A-stable, and symplectic.</li>
+    <li>Partitioned RK methods generalise symplectic schemes to separable Hamiltonians.</li>
+    <li>Symplectic RK methods are essential in Hamiltonian PDE integration and quantum simulation.</li>
+  </ul>
+
+  <p>
+    Gauss–Legendre schemes represent the “Rolls-Royce” of high-order symplectic ODE integrators.
+  </p>
+
+  <hr/>
+
+  <!-- 3.7.9 -->
+  <h3 id="sec-3-7-9">3.7.9 References for Section 3.7</h3>
+
+  <ol>
+    <li><strong>[HLW06]</strong> Hairer, Lubich, Wanner. <em>Geometric Numerical Integration</em>. Springer.</li>
+    <li><strong>[BC26]</strong> Blanes &amp; Casas. <em>Concise Introduction to GNI</em>, 2nd ed.</li>
+    <li><strong>[Butcher 2003]</strong> J.C. Butcher, <em>Numerical Methods for ODEs</em>.</li>
+    <li><strong>[Sanz-Serna 1988]</strong> “Runge–Kutta schemes for Hamiltonian systems.”</li>
+    <li><strong>[Cooper 1987]</strong> “Symplectic integrators.”</li>
+    <li><strong>[Iserles et al. 2000]</strong> “Lie-group methods and special RK schemes.”</li>
+  </ol>
+
+</section>
+
+<section id="sec-3-8">
+  <h2>3.8 Energy-Preserving and Volume-Preserving Integrators</h2>
+
+  <p>
+    While symplectic integrators preserve the symplectic 2-form and thus
+    induce near-conservation of Hamiltonian energy, they do <em>not</em> generally
+    conserve the Hamiltonian exactly.
+  </p>
+
+  <p>
+    Some systems, however, require <strong>exact energy conservation</strong>:
+  </p>
+
+  <ul>
+    <li>non-canonical Hamiltonian systems,</li>
+    <li>Poisson systems with Casimirs,</li>
+    <li>dissipation-free mechanical systems,</li>
+    <li>electrical circuit models,</li>
+    <li>many PDE semi-discretisations (e.g. NLS, KdV, Maxwell equations).</li>
+  </ul>
+
+  <p>
+    In these cases, one turns to <strong>energy-preserving integrators</strong> such as:
+  </p>
+
+  <ul>
+    <li>the discrete gradient method,</li>
+    <li>the Average Vector Field (AVF) method,</li>
+    <li>projection and null-space methods,</li>
+    <li>Poisson-preserving techniques.</li>
+  </ul>
+
+  <p>
+    Another important structure is <strong>volume-preservation</strong>, which appears in:
+  </p>
+
+  <ul>
+    <li>divergence-free systems,</li>
+    <li>incompressible fluids,</li>
+    <li>magnetic field-line flow,</li>
+    <li>Liouville-preserving dynamical systems.</li>
+  </ul>
+
+  <p>
+    We now survey these ideas and their geometric foundations.
+  </p>
+
+  <hr/>
+
+  <!-- 3.8.1 -->
+  <h3 id="sec-3-8-1">3.8.1 Energy Preservation and First Integrals</h3>
+
+  <p>
+    Let \(I(z)\) be a conserved quantity of a system:
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt} I(z(t)) = \nabla I(z)^\top f(z) = 0.
+    \]
+  </p>
+
+  <p>
+    A numerical method preserves this invariant if:
+  </p>
+
+  <p class="math">
+    \[
+      I(z_{n+1}) = I(z_n) \quad \text{for all }n.
+    \]
+  </p>
+
+  <p>
+    In general this is impossible for arbitrary high-order RK methods.
+  </p>
+
+  <p>
+    But it <em>is</em> possible when the method is built using:
+  </p>
+
+  <ul>
+    <li>discrete gradients,</li>
+    <li>specific Poisson structures,</li>
+    <li>modified flow invariants.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.8.2 -->
+  <h3 id="sec-3-8-2">3.8.2 Discrete Gradient Methods</h3>
+
+  <p>
+    Let \(H(z)\) be the Hamiltonian.  
+    A <strong>discrete gradient</strong> of \(H\) is a function
+  </p>
+
+  <p class="math">
+    \[
+      \bar{\nabla}H(z_n,z_{n+1})
+    \]
+  </p>
+
+  <p>
+    satisfying:
+  </p>
+
+  <p class="math">
+    \[
+      H(z_{n+1}) - H(z_n)
+      = \bar{\nabla}H(z_n,z_{n+1})^\top (z_{n+1} - z_n).
+    \]
+  </p>
+
+  <p>
+    This ensures that any update of the form:
+  </p>
+
+  <p class="math">
+    \[
+      \frac{z_{n+1} - z_n}{h}
+      = S(z_n,z_{n+1})\, \bar{\nabla} H(z_n,z_{n+1})
+    \]
+  </p>
+
+  <p>
+    preserves energy exactly whenever the matrix \(S\) is skew-symmetric.
+  </p>
+
+  <p>
+    Typical choices:
+  </p>
+
+  <ul>
+    <li>Gonzalez discrete gradient,</li>
+    <li>coordinate increment discrete gradient (CIDG),</li>
+    <li>average vector field discrete gradient.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.8.3 -->
+  <h3 id="sec-3-8-3">3.8.3 The Average Vector Field (AVF) Method</h3>
+
+  <p>
+    For \(\dot{z} = f(z)\), the AVF method is:
+  </p>
+
+  <p class="math">
+    \[
+      z_{n+1} = z_n + h \int_0^1 f\!\left( (1-\xi) z_n + \xi z_{n+1} \right)\, d\xi.
+    \]
+  </p>
+
+  <p>
+    For Hamiltonian systems with \(\dot{z} = S \nabla H(z)\), AVF preserves energy exactly:
+  </p>
+
+  <p class="math">
+    \[
+      H(z_{n+1}) = H(z_n).
+    \]
+  </p>
+
+  <p>
+    It is implicit but only requires one integral over the line segment between
+    \(z_n\) and \(z_{n+1}\).
+  </p>
+
+  <p>
+    Advantages:
+  </p>
+
+  <ul>
+    <li>second-order accuracy,</li>
+    <li>exact energy preservation,</li>
+    <li>good long-time stability,</li>
+    <li>works for general conservative systems (not only Hamiltonian).</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.8.4 -->
+  <h3 id="sec-3-8-4">3.8.4 Projection Methods</h3>
+
+  <p>
+    A simple idea:
+  </p>
+
+  <ol>
+    <li>Take a high-order method producing an intermediate point \(z^*\).</li>
+    <li>Project \(z^*\) onto the energy manifold:</li>
+  </ol>
+
+  <p class="math">
+    \[
+      z_{n+1} = z^* - \lambda \nabla H(z^*)
+    \]
+  </p>
+
+  <p>
+    where \(\lambda\) solves the constraint:
+  </p>
+
+  <p class="math">
+    \[
+      H(z_{n+1}) = H(z_n).
+    \]
+  </p>
+
+  <p>
+    This technique is general, easy to implement, but:
+  </p>
+
+  <ul>
+    <li>does not preserve symplectic structure,</li>
+    <li>may distort long-time behavior.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.8.5 -->
+  <h3 id="sec-3-8-5">3.8.5 Volume-Preserving Integrators</h3>
+
+  <p>
+    Many systems satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      \nabla \cdot f(z) = 0.
+    \]
+  </p>
+
+  <p>
+    By Liouville’s theorem, their flow preserves volume:
+  </p>
+
+  <p class="math">
+    \[
+      \det D\varphi_t = 1.
+    \]
+  </p>
+
+  <p>
+    A numerical method is volume-preserving if:
+  </p>
+
+  <p class="math">
+    \[
+      \det D\Phi_h = 1.
+    \]
+  </p>
+
+  <h4>Key classes:</h4>
+
+  <ul>
+    <li>splitting methods for divergence-free vector fields,</li>
+    <li>semi-implicit schemes for fluid flows,</li>
+    <li>magnetic field-line ODEs (Boris algorithm is volume-preserving!),</li>
+    <li>Jacobian-free integrators using divergence decomposition:</li>
+  </ul>
+
+  <p class="math">
+    \[
+      f = f^{(1)} + \cdots + f^{(k)}, \quad 
+      \nabla \cdot f^{(i)} = 0.
+    \]
+  </p>
+
+  <hr/>
+
+  <!-- 3.8.6 -->
+  <h3 id="sec-3-8-6">3.8.6 Relationship Between Symplectic and Energy-Preserving Methods</h3>
+
+  <p>
+    Symplectic ↔ Energy-preserving methods form two distinct families:
+  </p>
+
+  <figure id="fig-3-12" style="text-align:center;">
+    <svg width="500" height="160">
+      <rect x="20" y="20" width="200" height="120" fill="#eef" stroke="#99c"/>
+      <rect x="280" y="20" width="200" height="120" fill="#efe" stroke="#9c9"/>
+      <text x="50" y="55" font-size="16">Symplectic</text>
+      <text x="50" y="85" font-size="14">RK, splitting, variational</text>
+
+      <text x="310" y="55" font-size="16">Energy-Preserving</text>
+      <text x="310" y="85" font-size="14">AVF, discrete gradient</text>
+
+      <line x1="220" y1="80" x2="280" y2="80" 
+            stroke="#888" stroke-dasharray="6,4"/>
+      <text x="215" y="70" font-size="12">(rare intersection)</text>
+    </svg>
+    <figcaption><strong>Figure 3.12</strong> – Symplectic vs energy-preserving methods. Distinct but occasionally overlapping.</figcaption>
+  </figure>
+
+  <p>
+    In general:
+  </p>
+
+  <ul>
+    <li>Symplectic methods <strong>preserve structure</strong> and give near-conservation of energy.</li>
+    <li>Energy-preserving methods <strong>preserve invariants</strong> but may not preserve symplectic structure.</li>
+  </ul>
+
+  <p>
+    Only in rare cases does a method preserve both (AVF on certain quadratic Hamiltonians).
+  </p>
+
+  <hr/>
+
+  <!-- 3.8.7 -->
+  <h3 id="sec-3-8-7">3.8.7 Interactive Demo: AVF vs RK4</h3>
+
+  <p>
+    Below we compare energy error for the harmonic oscillator:
+  </p>
+
+  <ul>
+    <li>RK4 (not energy-preserving),</li>
+    <li>AVF (exact energy preservation).</li>
+  </ul>
+
+  <figure id="fig-3-13" style="text-align:center;">
+    <canvas id="avfDemo" width="520" height="270"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 3.13</strong> – RK4 energy drift (blue) vs AVF exact conservation (green).
+    </figcaption>
+  </figure>
+
+  <script>
+  (function(){
+    const canvas=document.getElementById("avfDemo");
+    if(!canvas) return;
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width, h=canvas.height;
+
+    const hstep=0.08;
+    function H(z){ return 0.5*(z[0]*z[0] + z[1]*z[1]); }
+
+    let z4=[1,0];
+    let zA=[1,0];
+
+    function f([q,p]){ return [p, -q]; }
+
+    function rk4(z){
+      const k1=f(z);
+      const k2=f([z[0]+0.5*hstep*k1[0], z[1]+0.5*hstep*k1[1]]);
+      const k3=f([z[0]+0.5*hstep*k2[0], z[1]+0.5*hstep*k2[1]]);
+      const k4=f([z[0]+hstep*k3[0], z[1]+hstep*k3[1]]);
+      return [
+        z[0] + hstep*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
+        z[1] + hstep*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6
+      ];
+    }
+
+    // AVF method: for harmonic oscillator, AVF coincides with implicit midpoint
+    function avf(z){
+      // implicit midpoint with fixed-point
+      let q=z[0], p=z[1];
+      let qm=q, pm=p;
+      for(let iter=0; iter<5; iter++){
+        const qmid = 0.5*(q + qm);
+        const pmid = 0.5*(p + pm);
+        qm = q + hstep*pmid;
+        pm = p - hstep*qmid;
+      }
+      return [qm, pm];
+    }
+
+    let t=0;
+    function animate(){
+      t+=hstep;
+      z4=rk4(z4);
+      zA=avf(zA);
+
+      const x=t;
+      const y4 = h - H(z4)*0.06;
+      const yA = h*0.5 - H(zA)*0.06;
+
+      ctx.fillStyle="#06c"; ctx.fillRect(x,y4,2,2);
+      ctx.fillStyle="#0a0"; ctx.fillRect(x,yA,2,2);
+
+      if(x<w) requestAnimationFrame(animate);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    animate();
+  })();
+  </script>
+
+  <hr/>
+
+  <!-- 3.8.8 -->
+  <h3 id="sec-3-8-8">3.8.8 Summary</h3>
+
+  <ul>
+    <li>Energy-preserving methods are vital for conservative systems not in canonical Hamiltonian form.</li>
+    <li>Discrete gradients guarantee exact preservation of invariants.</li>
+    <li>AVF is a powerful, general-purpose, structure-preserving integrator.</li>
+    <li>Volume-preserving methods appear in divergence-free flows and plasma dynamics.</li>
+    <li>Symplectic and energy-preserving integrators rarely coincide; each serves different geometric goals.</li>
+  </ul>
+
+  <hr/>
+
+  <!-- 3.8.9 -->
+  <h3 id="sec-3-8-9">3.8.9 References for Section 3.8</h3>
+
+  <ol>
+    <li><strong>[HLW06]</strong> Hairer, Lubich, Wanner. <em>Geometric Numerical Integration</em>.</li>
+    <li><strong>[BC26]</strong> Blanes & Casas. <em>Concise Introduction to GNI</em>, 2nd ed.</li>
+    <li><strong>[Gonzalez 1996]</strong> “Time integration and discrete gradients.”</li>
+    <li><strong>[Qin et al. 2015]</strong> “Why is Boris algorithm so good?” PoP.</li>
+    <li><strong>[Quispel–McLaren 2008]</strong> “A new class of energy-preserving integrators.”</li>
+    <li><strong>[Iserles et al. 2000]</strong> “Volume-preserving methods.”</li>
+  </ol>
+
+</section>
+
+<hr />
+<nav style="background:#eee; padding:0.5em; margin-top:1em;">
+    <a href="chapter02.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a href="chapter04.html">Next</a>
+</nav>
+</body>
+
+</html>

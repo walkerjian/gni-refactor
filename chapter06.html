@@ -1,0 +1,2814 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter 6 - Geometric Numerical Integration</title>
+    <style>
+        body {
+            font-family: serif;
+            line-height: 1.5;
+            margin: 2em;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: Georgia, serif;
+        }
+
+        code {
+            background: #eee;
+            padding: 2px 4px;
+        }
+
+        .task {
+            color: #777;
+            font-style: italic;
+        }
+
+        a {
+            text-decoration: none;
+            color: #006;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>6. Backward Error Analysis (BEA)</h1>
+    <nav style="background:#eee; padding:0.5em; margin-bottom:1em;">
+        <a href="chapter05.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a
+            href="chapter07.html">Next</a>
+    </nav>
+    <hr /><section id="sec-6-0">
+
+  <h2>6.0 Overview: Why Splitting & Composition Methods?</h2>
+
+  <p>
+    In the previous chapters we developed geometric structure, symplecticity,
+    Lie–algebraic flows, exponential integrators, and stability theory. We now
+    introduce one of the most powerful and widely used classes of geometric
+    integrators: <strong>splitting and composition methods</strong>.
+  </p>
+
+  <p>
+    These methods exploit the fact that many differential equations can be 
+    written as the sum of <em>simpler vector fields</em> whose individual flows 
+    are exactly integrable or preserve essential geometric properties.
+  </p>
+
+  <hr/>
+
+  <h3>6.0.1 The Basic Idea</h3>
+
+  <p>
+    Consider an evolution equation
+  </p>
+
+  <p class="math">
+    \[
+      y' = (B + C)(y), 
+    \]
+  </p>
+
+  <p>
+    where the flows of the subfields <span class="math">B</span> and <span class="math">C</span>
+    are individually computable:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_B^t = e^{tB}, 
+      \qquad 
+      \Phi_C^t = e^{tC}.
+    \]
+  </p>
+
+  <p>
+    Splitting methods approximate the combined flow by compositions of these 
+    simpler flows, e.g.
+  </p>
+
+  <p class="math">
+    \[
+      e^{h(B+C)} \approx e^{hB} e^{hC},
+    \]
+  </p>
+
+  <p>
+    or symmetric/higher-order variants. Since <em>each exponential preserves
+    geometric structure</em> (e.g. symplectic, orthogonal, or unitary), the
+    composition inherits these invariants automatically.
+  </p>
+
+  <hr/>
+
+  <h3>6.0.2 Why Splitting? Geometry and Efficiency</h3>
+
+  <p>Advantages of splitting approaches:</p>
+
+  <ul>
+    <li>They preserve geometric properties such as symplecticity, time reversibility,
+      and invariants of motion when the subflows do.</li>
+    <li>They often reduce computational cost dramatically by isolating expensive
+      operators (e.g. stiff linear parts).</li>
+    <li>They are naturally suited for <strong>Hamiltonian systems</strong>,
+      <strong>quantum dynamics</strong>, and <strong>semilinear PDEs</strong>.</li>
+    <li>They generalise smoothly to <strong>Lie groups</strong> and <strong>manifold-valued flows</strong>.</li>
+    <li>They provide a clean path to arbitrarily high order using symmetric compositions.</li>
+  </ul>
+
+  <hr/>
+
+  <h3>6.0.3 Compositions: From First-Order to Arbitrarily High Order</h3>
+
+  <p>
+    Starting from a basic (possibly low-order) splitting operator
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{S}(h) = e^{hB}e^{hC},
+    \]
+  </p>
+
+  <p>
+    one constructs higher-order methods by nesting compositions:
+  </p>
+
+  <p class="math">
+    \[
+      \mathcal{S}(a_1 h)\,\mathcal{S}(a_2 h)\cdots 
+      \mathcal{S}(a_m h).
+    \]
+  </p>
+
+  <p>
+    Carefully chosen coefficients eliminate lower-order error terms in the
+    Baker–Campbell–Hausdorff expansion, yielding high-order integrators with
+    minimal additional computational cost.
+  </p>
+
+  <p>Examples include:</p>
+
+  <ul>
+    <li>Strang (symmetric second order)</li>
+    <li>Yoshida 4th, 6th, 8th order compositions</li>
+    <li>Suzuki fractal compositions</li>
+    <li>Optimised and complex-coefficient factorizations</li>
+  </ul>
+
+  <hr/>
+
+  <h3>6.0.4 Connections to Other Areas</h3>
+
+  <p>Splitting methods reside at the intersection of:</p>
+
+  <ul>
+    <li>Baker–Campbell–Hausdorff theory</li>
+    <li>Lie algebras and manifold flows</li>
+    <li>Symplectic geometry and Hamiltonian mechanics</li>
+    <li>Exponential integrators for stiff/semi-linear PDEs</li>
+    <li>Operator-splitting theory for parabolic/hyperbolic systems</li>
+    <li>Quantum simulation and gate approximations</li>
+    <li>Time-evolving block decimation (TEBD) in tensor networks</li>
+    <li>Reversible and symplectic deep learning architectures (Neural ODEs)</li>
+  </ul>
+
+  <p>
+    Thus splitting and composition methods form a <strong>unifying framework</strong>
+    for geometric time integration across physics, chemistry, applied mathematics,
+    and computational engineering.
+  </p>
+
+  <hr/>
+
+  <h3>6.0.5 Outline of Chapter 6</h3>
+
+  <p>This chapter develops the foundational splitting methods:</p>
+
+  <ol>
+    <li><strong>Lie–Trotter Splitting</strong>: first-order, non-symmetric.</li>
+    <li><strong>Strang Splitting</strong>: symmetric second-order.</li>
+    <li><strong>Higher-Order Composition Schemes</strong>:
+      Yoshida, Suzuki, complex-coefficient.</li>
+    <li><strong>Applications to Hamiltonian Flows</strong>:
+      separable H = T + V, MD, celestial mechanics.</li>
+    <li><strong>Applications to PDEs</strong>:
+      Schrödinger, heat, NLS, Klein–Gordon, Maxwell.</li>
+    <li><strong>Relation to Magnus and Exponential Integrators</strong>:
+      BCH and high-order commutator structure.</li>
+    <li><strong>Backward Error Analysis</strong> for splitting.</li>
+    <li><strong>Modern Applications</strong>:
+      HMC, TEBD, quantum computing gate sequences.</li>
+  </ol>
+
+  <p>
+    Splitting is thus the backbone of a huge class of geometric integrators.
+  </p>
+
+</section>
+
+<section id="sec-6-1">
+
+  <h2>6.1 Lie and Strang Splitting</h2>
+
+  <p>
+    In this section we study the two fundamental splitting schemes:
+  </p>
+
+  <ol>
+    <li><strong>Lie–Trotter splitting</strong> (first order),</li>
+    <li><strong>Strang splitting</strong> (second order, symmetric).</li>
+  </ol>
+
+  <p>
+    We will:
+  </p>
+
+  <ol>
+    <li>Set up the abstract evolution problem and the notion of splitting,</li>
+    <li>Define Lie–Trotter splitting and derive its local error using BCH,</li>
+    <li>Define Strang splitting and prove it is second order and time-reversible,</li>
+    <li>Discuss geometric properties (symplecticity, reversibility, invariants),</li>
+    <li>Illustrate the methods on a simple Hamiltonian example with an interactive figure.</li>
+  </ol>
+
+  <hr/>
+
+  <h3 id="sec-6-1-1">6.1.1 Problem Setting and Operator Splitting</h3>
+
+  <p>
+    Let \(y(t)\) solve an autonomous ODE on a manifold \(M\):
+  </p>
+
+  <p class="math">
+    \[
+      \dot{y}(t) = f(y(t)), \qquad y(0) = y_0 \in M.
+    \]
+  </p>
+
+  <p>
+    Suppose the vector field \(f\) admits a decomposition into <em>simpler</em> parts
+  </p>
+
+  <p class="math">
+    \[
+      f = f^{[1]} + f^{[2]},
+    \]
+  </p>
+
+  <p>
+    such that the flows of the subsystems
+  </p>
+
+  <p class="math">
+    \[
+      \dot{y} = f^{[1]}(y), \qquad
+      \dot{y} = f^{[2]}(y)
+    \]
+  </p>
+
+  <p>
+    can be computed (almost) exactly or very efficiently. Denote their flows by
+  </p>
+
+  <p class="math">
+    \[
+      \varphi_h^{[1]} = \exp(h F^{[1]}), \qquad
+      \varphi_h^{[2]} = \exp(h F^{[2]}),
+    \]
+  </p>
+
+  <p>
+    where \(F^{[j]}\) are the corresponding differential operators
+    \(F^{[j]} = f^{[j]}\!\cdot\nabla\). The full flow is
+  </p>
+
+  <p class="math">
+    \[
+      \varphi_h = \exp\!\big(h(F^{[1]} + F^{[2]})\big).
+    \]
+  </p>
+
+  <p>
+    A <strong>splitting method</strong> approximates \(\varphi_h\) by a composition of
+    subflows, e.g.
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h = \varphi_{a_1 h}^{[1]} \circ \varphi_{b_1 h}^{[2]}
+               \circ \cdots \circ
+               \varphi_{a_s h}^{[1]} \circ \varphi_{b_s h}^{[2]},
+    \]
+  </p>
+
+  <p>
+    with suitable coefficients \(a_j, b_j\). The simplest choices give the
+    classical Lie–Trotter and Strang splittings.
+  </p>
+
+  <p class="task">
+    Task marker: later sections will generalize this to multiple splits
+    \(f = f^{[1]} + \cdots + f^{[m]}\) and to composition schemes of arbitrarily
+    high order.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-1-2">6.1.2 Lie–Trotter Splitting</h3>
+
+  <p>
+    The <strong>Lie–Trotter splitting</strong> (or first-order splitting) uses the simple
+    product of exponentials
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{\mathrm{LT}}
+      := \varphi_h^{[1]} \circ \varphi_h^{[2]}
+      = \exp(h F^{[1]}) \exp(h F^{[2]}).
+    \]
+  </p>
+
+  <p>
+    The corresponding one-step method is
+  </p>
+
+  <p class="math">
+    \[
+      y_{n+1} =
+      \Phi_h^{\mathrm{LT}}(y_n)
+      = \varphi_h^{[1]}\big( \varphi_h^{[2]}(y_n)\big).
+    \]
+  </p>
+
+  <h4>Local error via BCH</h4>
+
+  <p>
+    The Baker–Campbell–Hausdorff (BCH) formula gives
+  </p>
+
+  <p class="math">
+    \[
+      \exp(h F^{[1]}) \exp(h F^{[2]})
+      = \exp\Big(
+          h(F^{[1]} + F^{[2]})
+          + \tfrac{h^2}{2}[F^{[1]},F^{[2]}]
+          + \mathcal{O}(h^3)
+        \Big).
+    \]
+  </p>
+
+  <p>
+    Thus the Lie–Trotter step is the exact flow of a <em>modified vector field</em>
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{F}
+      = F^{[1]} + F^{[2]}
+        + \tfrac{h}{2}[F^{[1]},F^{[2]}]
+        + \mathcal{O}(h^2),
+    \]
+  </p>
+
+  <p>
+    so the local truncation error is \(\mathcal{O}(h^2)\) and the method has
+    <strong>global order 1</strong>.
+  </p>
+
+  <p class="task">
+    Task marker: in BEA we will explicitly compute the modified Hamiltonian for
+    Hamiltonian splittings and relate the commutator term to Poisson brackets.
+  </p>
+
+  <h4>Geometric properties</h4>
+
+  <ul>
+    <li>
+      If each subflow \(\varphi_h^{[j]}\) is symplectic, then
+      \(\Phi_h^{\mathrm{LT}}\) (as their composition) is symplectic.
+    </li>
+    <li>
+      If each subflow preserves a constraint manifold, so does the composition.
+    </li>
+    <li>
+      However, the method is <em>not symmetric</em> (time-reversible) in general:
+      its adjoint is
+      \(\big(\Phi_h^{\mathrm{LT}}\big)^\star
+         = \exp(hF^{[2]})\exp(hF^{[1]}) \neq \Phi_h^{\mathrm{LT}}\).
+    </li>
+  </ul>
+
+  <hr/>
+
+  <h3 id="sec-6-1-3">6.1.3 Strang Splitting (Second Order, Symmetric)</h3>
+
+  <p>
+    The <strong>Strang splitting</strong> (Strang 1968) is the symmetric composition
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{\mathrm{S}}
+      := \varphi_{h/2}^{[1]} \circ \varphi_{h}^{[2]} \circ \varphi_{h/2}^{[1]}
+      = \exp\!\left(\tfrac{h}{2}F^{[1]}\right)
+        \exp\!\left(h F^{[2]}\right)
+        \exp\!\left(\tfrac{h}{2}F^{[1]}\right).
+    \]
+  </p>
+
+  <p>
+    The corresponding scheme is:
+  </p>
+
+  <ol>
+    <li><em>Half-step in \(f^{[1]}\)</em>:
+      \(y^{(1)} = \varphi_{h/2}^{[1]}(y_n)\),</li>
+    <li><em>Full step in \(f^{[2]}\)</em>:
+      \(y^{(2)} = \varphi_{h}^{[2]}(y^{(1)})\),</li>
+    <li><em>Half-step in \(f^{[1]}\)</em>:
+      \(y_{n+1} = \varphi_{h/2}^{[1]}(y^{(2)})\).</li>
+  </ol>
+
+  <h4>Order of accuracy via BCH</h4>
+
+  <p>
+    Using BCH and symmetry, one can show that the odd-order error terms cancel.
+    More concretely,
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{\mathrm{S}}
+      = \exp\!\Big(
+          h(F^{[1]}+F^{[2]})
+          + \mathcal{O}(h^3)
+        \Big),
+    \]
+  </p>
+
+  <p>
+    so the local error is \(\mathcal{O}(h^3)\) and the global error is
+    \(\mathcal{O}(h^2)\): Strang splitting has <strong>order 2</strong>.
+  </p>
+
+  <p>
+    A key general principle is:
+  </p>
+
+  <blockquote>
+    <em>Self-adjoint (time-symmetric) one-step methods of order ≥ 1 are always of
+    even order.</em>
+  </blockquote>
+
+  <p>
+    Strang splitting is self-adjoint, hence order 2 rather than 1.
+  </p>
+
+  <h4>Time symmetry (reversibility)</h4>
+
+  <p>
+    Let \(\Phi_h^\star\) denote the adjoint method defined by
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^\star := \Phi_{-h}^{-1}.
+    \]
+  </p>
+
+  <p>
+    A one-step method is <strong>self-adjoint</strong> (or time-symmetric) if
+    \(\Phi_h^\star = \Phi_h\).
+    For Strang splitting,
+  </p>
+
+  <p class="math">
+    \[
+      \big(\Phi_h^{\mathrm{S}}\big)^{-1}
+      = \varphi_{-h/2}^{[1]} \circ \varphi_{-h}^{[2]} \circ \varphi_{-h/2}^{[1]}
+      = \Phi_{-h}^{\mathrm{S}},
+    \]
+  </p>
+
+  <p>
+    hence \(\Phi_h^{\mathrm{S}}\) is self-adjoint. This is crucial for good
+    long-time behaviour, especially in reversible and Hamiltonian systems.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-1-4">6.1.4 Geometric Properties of Lie and Strang Splittings</h3>
+
+  <p>
+    Let us summarize the main geometric features when the splitting is applied
+    to a structured system, e.g. a Hamiltonian system with
+    \(H = H^{[1]} + H^{[2]}\).
+  </p>
+
+  <ul>
+    <li>
+      If \(f^{[j]}\) are Hamiltonian vector fields for \(H^{[j]}\),
+      then \(\varphi_t^{[j]}\) are symplectic maps. Any composition of them
+      (including Lie–Trotter and Strang) is symplectic.
+    </li>
+    <li>
+      <strong>Symplecticity:</strong> both Lie–Trotter and Strang splitting are
+      symplectic for Hamiltonian splittings.
+    </li>
+    <li>
+      <strong>Reversibility:</strong> Strang splitting is reversible
+      (self-adjoint), while Lie–Trotter is not.
+    </li>
+    <li>
+      <strong>Energy behaviour:</strong> in the Hamiltonian case, backward error
+      analysis shows that both methods almost conserve a modified Hamiltonian
+      \( \tilde{H} = H + \mathcal{O}(h) \) (Lie–Trotter) or
+      \( \tilde{H} = H + \mathcal{O}(h^2) \) (Strang) over very long times.
+    </li>
+  </ul>
+
+  <p class="task">
+    Task marker: in later sections we derive explicit modified Hamiltonians
+    for separable systems \(H(q,p) = T(p) + V(q)\) under Strang splitting, and
+    compare with standard symplectic Euler and Verlet.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-1-5">6.1.5 Example: Separable Hamiltonian \(H(q,p) = T(p) + V(q)\)</h3>
+
+  <p>
+    A prototypical application is a separable Hamiltonian system
+  </p>
+
+  <p class="math">
+    \[
+      H(q,p) = T(p) + V(q), \qquad
+      (q,p) \in \mathbb{R}^m \times \mathbb{R}^m.
+    \]
+  </p>
+
+  <p>
+    The Hamiltonian vector field splits as
+  </p>
+
+  <p class="math">
+    \[
+      \dot{q} = \nabla_p T(p), \qquad
+      \dot{p} = -\nabla_q V(q),
+    \]
+  </p>
+
+  <p>
+    which we interpret as the sum of two subfields:
+  </p>
+
+  <ul>
+    <li>
+      <strong>Drift (kinetic) part</strong> \(f^{[1]}\):
+      \(\dot{q} = \nabla_p T(p), \; \dot{p}=0\),
+    </li>
+    <li>
+      <strong>Kick (potential) part</strong> \(f^{[2]}\):
+      \(\dot{q} = 0, \; \dot{p} = -\nabla_q V(q)\).
+    </li>
+  </ul>
+
+  <p>
+    Their flows are explicitly available:
+  </p>
+
+  <p class="math">
+    \[
+      \varphi_h^{[1]}(q,p) = \big(q + h\nabla_p T(p),\; p\big),
+      \qquad
+      \varphi_h^{[2]}(q,p) = \big(q,\; p - h\nabla_q V(q)\big).
+    \]
+  </p>
+
+  <p>
+    Applying Strang splitting gives the well-known <strong>velocity Verlet</strong> /
+    <strong>leapfrog</strong> scheme:
+  </p>
+
+  <ol>
+    <li>
+      Half kick:
+      \(
+        p_{n+\frac{1}{2}} = p_n - \frac{h}{2}\nabla_q V(q_n)
+      \)
+    </li>
+    <li>
+      Drift:
+      \(
+        q_{n+1} = q_n + h \nabla_p T(p_{n+\frac{1}{2}})
+      \)
+    </li>
+    <li>
+      Half kick:
+      \(
+        p_{n+1} = p_{n+\frac{1}{2}} - \frac{h}{2}\nabla_q V(q_{n+1})
+      \)
+    </li>
+  </ol>
+
+  <p>
+    This is the cornerstone integrator in molecular dynamics, celestial mechanics,
+    and Hamiltonian Monte Carlo.
+  </p>
+
+  <figure id="fig-6-1" style="text-align:center;">
+    <canvas id="splittingCanvas" width="620" height="300"
+            style="border:1px solid #ccc;"></canvas>
+    <figcaption>
+      <strong>Figure 6.1</strong> – Energy behaviour for the 1D harmonic oscillator
+      \(H(q,p)=\tfrac{1}{2}(p^2+q^2)\): comparison of Lie–Trotter splitting and
+      Strang splitting. The Strang (leapfrog) method shows bounded, oscillatory
+      energy error, while Lie–Trotter shows a systematic bias.
+    </figcaption>
+  </figure>
+
+  <script>
+    (function(){
+      const canvas = document.getElementById("splittingCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width, h = canvas.height;
+
+      // Parameters
+      const hstep = 0.2;
+      const steps = 300;
+      const q0 = 1.0, p0 = 0.0;
+
+      function H(q,p){ return 0.5*(q*q + p*p); }
+
+      // Lie–Trotter splitting for harmonic oscillator with
+      //   T(p)=p^2/2 => drift: q' = p, p' =0
+      //   V(q)=q^2/2 => kick : q'=0, p'=-q
+      function stepLieTrotter(q,p,h){
+        // full drift then full kick: φ_h^[1] ∘ φ_h^[2] or vice versa
+        // we choose  φ_h^[1] (drift) ∘ φ_h^[2] (kick)
+        // Kick
+        p = p - h*q;
+        // Drift
+        q = q + h*p;
+        return {q,p};
+      }
+
+      // Strang splitting (leapfrog)
+      function stepStrang(q,p,h){
+        // half kick
+        p = p - 0.5*h*q;
+        // drift
+        q = q + h*p;
+        // half kick
+        p = p - 0.5*h*q;
+        return {q,p};
+      }
+
+      const tVals = [];
+      const E_Lie = [];
+      const E_Str = [];
+
+      // Simulate Lie–Trotter
+      let q = q0, p = p0;
+      for(let n=0;n<=steps;n++){
+        const t = n*hstep;
+        tVals.push(t);
+        E_Lie.push(H(q,p));
+        const st = stepLieTrotter(q,p,hstep);
+        q = st.q; p = st.p;
+      }
+
+      // Simulate Strang
+      q = q0; p = p0;
+      for(let n=0;n<=steps;n++){
+        E_Str.push(H(q,p));
+        const st = stepStrang(q,p,hstep);
+        q = st.q; p = st.p;
+      }
+
+      const Emin = Math.min.apply(null, E_Lie.concat(E_Str));
+      const Emax = Math.max.apply(null, E_Lie.concat(E_Str));
+      const padLeft=50, padRight=10, padTop=10, padBottom=30;
+
+      function X(t){
+        const tmin=0, tmax=tVals[tVals.length-1];
+        return padLeft + (t - tmin)*(w-padLeft-padRight)/(tmax-tmin);
+      }
+      function Y(E){
+        return h - padBottom - (E-Emin)*(h-padTop-padBottom)/(Emax-Emin);
+      }
+
+      ctx.clearRect(0,0,w,h);
+      ctx.font="12px sans-serif";
+
+      // Axes
+      ctx.beginPath();
+      ctx.moveTo(padLeft, padTop);
+      ctx.lineTo(padLeft, h-padBottom);
+      ctx.lineTo(w-padRight, h-padBottom);
+      ctx.strokeStyle="#000";
+      ctx.stroke();
+
+      ctx.fillText("t", w-padRight-10, h-padBottom+18);
+      ctx.fillText("H", padLeft-18, padTop+10);
+
+      // Plot Lie–Trotter
+      ctx.beginPath();
+      for(let n=0;n<tVals.length;n++){
+        const x = X(tVals[n]);
+        const y = Y(E_Lie[n]);
+        if(n===0) ctx.moveTo(x,y);
+        else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle="#c00";
+      ctx.stroke();
+
+      // Plot Strang
+      ctx.beginPath();
+      for(let n=0;n<tVals.length;n++){
+        const x = X(tVals[n]);
+        const y = Y(E_Str[n]);
+        if(n===0) ctx.moveTo(x,y);
+        else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle="#06c";
+      ctx.stroke();
+
+      // Legend
+      ctx.fillStyle="#c00";
+      ctx.fillRect(padLeft+10, padTop+5, 12, 3);
+      ctx.fillStyle="#000";
+      ctx.fillText("Lie–Trotter", padLeft+30, padTop+11);
+
+      ctx.fillStyle="#06c";
+      ctx.fillRect(padLeft+10, padTop+20, 12, 3);
+      ctx.fillStyle="#000";
+      ctx.fillText("Strang (leapfrog)", padLeft+30, padTop+26);
+    })();
+  </script>
+
+  <hr/>
+
+  <h3 id="sec-6-1-6">6.1.6 Summary and References for 6.1</h3>
+
+  <p>
+    In this section we:
+  </p>
+
+  <ul>
+    <li>Defined the abstract splitting setting for \(f = f^{[1]} + f^{[2]}\),</li>
+    <li>Introduced Lie–Trotter splitting (first order) and its BCH-based error,</li>
+    <li>Introduced Strang splitting (second order, symmetric) and its time-reversibility,</li>
+    <li>Discussed symplecticity and reversibility for Hamiltonian splittings,</li>
+    <li>Derived leapfrog / velocity Verlet as Strang splitting for separable Hamiltonians,</li>
+    <li>Illustrated energy behaviour on the harmonic oscillator via an interactive plot.</li>
+  </ul>
+
+  <p>
+    These schemes are the building blocks for higher-order composition methods
+    and for many modern applications (Hamiltonian Monte Carlo, quantum simulation,
+    PDE splitting, etc.). Subsequent sections generalize these ideas to
+    multi-part splittings and higher-order factorizations.
+  </p>
+
+  <h4>References for Section 6.1</h4>
+
+  <ol>
+    <li>
+      <strong>[Str68]</strong> G. Strang,
+      “On the construction and comparison of difference schemes,”
+      <em>SIAM Journal on Numerical Analysis</em>, 5(3):506–517, 1968.
+    </li>
+    <li>
+      <strong>[HLW06]</strong> E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration: Structure-Preserving Algorithms for Ordinary Differential Equations</em>,
+      2nd ed., Springer, 2006. (Ch. II, IV on splitting methods.)
+    </li>
+    <li>
+      <strong>[BC26]</strong> S. Blanes, F. Casas,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>,
+      2nd ed., CRC Press, 2026. (Chapters on splitting and composition methods.)
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-6-2">
+
+  <h2>6.2 Symmetric Composition Methods: From Strang to High Order</h2>
+
+  <p>
+    Strang splitting is the simplest nontrivial symmetric composition:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{\mathrm{S}}
+      = \varphi^{[1]}_{h/2} \circ \varphi^{[2]}_{h} \circ \varphi^{[1]}_{h/2},
+    \]
+  </p>
+
+  <p>
+    which is second order because symmetry causes cancellation of all odd-order
+    error terms in the BCH expansion. This section develops the general theory:
+    <em>how symmetric compositions lead to arbitrarily high-order geometric
+    integrators</em>.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-2-1">6.2.1 General Symmetric Composition</h3>
+
+  <p>
+    Let \(\Psi_h\) be a basic method of order \(p\), and assume it is
+    <strong>self-adjoint</strong> (i.e. reversible, symmetric):
+  </p>
+
+  <p class="math">
+    \[
+      \Psi^{\star}_{h} = \Psi_h.
+    \]
+  </p>
+
+  <p>
+    Consider a symmetric composition with real coefficients
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h^{(m)}
+      = 
+      \Psi_{a_1 h} \circ \Psi_{a_2 h} \circ \cdots \circ 
+      \Psi_{a_s h} \circ \Psi_{a_{s} h} \circ \cdots 
+      \Psi_{a_2 h} \circ \Psi_{a_1 h}.
+    \tag{6.2.1}
+    \]
+  </p>
+
+  <p>
+    Symmetry ensures the overall method is self-adjoint:
+  </p>
+
+  <p class="math">
+    \[
+      \big(\Psi_h^{(m)}\big)^\star = \Psi_h^{(m)}.
+    \]
+  </p>
+
+  <p>
+    As a consequence, all <em>odd-order</em> terms in the BCH expansion cancel.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-2-2">6.2.2 BCH Structure and Order Conditions</h3>
+
+  <p>
+    Let the modified vector field of \(\Psi_h\) be
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{F}(h)
+      = 
+      F
+      + h^{p} E_{p}
+      + h^{p+1} E_{p+1}
+      + h^{p+2} E_{p+2}
+      + \cdots.
+    \tag{6.2.2}
+    \]
+  </p>
+
+  <p>
+    Inserting scaled steps \(a_j h\) yields modified fields
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{F}(a_j h)
+      = 
+      F
+      + a_j^{p} h^{p} E_p
+      + a_j^{p+1} h^{p+1} E_{p+1}
+      + \cdots.
+    \]
+  </p>
+
+  <p>
+    The BCH formula for the symmetric composition (6.2.1) has only even powers:
+  </p>
+
+  <p class="math">
+    \[
+      \log\big(\Psi_h^{(m)}\big)
+      =
+      h F
+      + h^{p+2} C_{p+2}(a_1,\ldots,a_s)
+      + h^{p+4} C_{p+4}(a_1,\ldots,a_s)
+      + \cdots.
+    \tag{6.2.3}
+    \]
+  </p>
+
+  <p>
+    The <strong>order conditions</strong> are the algebraic constraints on 
+    \(a_1,\ldots,a_s\) ensuring that
+  </p>
+
+  <p class="math">
+    \[
+      C_{p+2} = C_{p+4} = \cdots = C_{P-1} = 0.
+    \]
+  </p>
+
+  <p>
+    This yields an overall method of order \(P\).
+  </p>
+
+  <p class="task">
+    Task marker: later sections will list explicit order conditions for splitting
+    and composition up to 8th order using the Lyndon word basis for the free 
+    Lie algebra.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-2-3">6.2.3 Yoshida’s Triple-Jump: Raising Order by Two</h3>
+
+  <p>
+    Let \(\Psi_h\) be a symmetric method of order \(2m\). Yoshida (1990) showed that
+    the composition
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h^{(m+1)}
+      =
+      \Psi_{\alpha h}
+      \circ \Psi_{\beta h}
+      \circ \Psi_{\alpha h}
+    \tag{6.2.4}
+    \]
+  </p>
+
+  <p>
+    is a symmetric method of order \(2m + 2\) provided \(\alpha, \beta\) satisfy
+  </p>
+
+  <p class="math">
+    \[
+      2\alpha + \beta = 1,
+      \qquad
+      2\alpha^{2m+1} + \beta^{2m+1} = 0.
+    \tag{6.2.5}
+    \]
+  </p>
+
+  <p>
+    These equations have the explicit solution
+  </p>
+
+  <p class="math">
+    \[
+      \alpha = \frac{1}{2 - 2^{1/(2m+1)}},
+      \qquad
+      \beta = -\,\frac{2^{1/(2m+1)}}{2 - 2^{1/(2m+1)}}.
+    \tag{6.2.6}
+    \]
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  <table style="margin: 1em auto; border-collapse: collapse;" border="1">
+    <thead>
+      <tr>
+        <th>Base Order</th>
+        <th>Resulting Order</th>
+        <th>\(\alpha\)</th>
+        <th>\(\beta\)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>2</td>
+        <td>4</td>
+        <td>\(\displaystyle \frac{1}{2-2^{1/3}} \approx 0.675603\)</td>
+        <td>\(1 - 2\alpha \approx -0.351207\)</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>6</td>
+        <td>\(\displaystyle \frac{1}{2-2^{1/5}} \approx 0.587\)</td>
+        <td>\(1 - 2\alpha \approx -0.174\)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    Starting from Strang (\(2^{nd}\) order), repeated Yoshida triple-jumps yield
+    methods of orders 4, 6, 8, …
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-2-4">6.2.4 Suzuki’s Fractal Composition</h3>
+
+  <p>
+    Suzuki (1991) extended Yoshida’s idea to general “fractal” compositions.
+    A common example is:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h^{(p+2)}
+      =
+      \Psi_{\gamma h}^{(p)} \circ
+      \Psi_{\delta h}^{(p)} \circ
+      \Psi_{\gamma h}^{(p)}
+    \tag{6.2.7}
+    \]
+  </p>
+
+  <p>
+    with coefficients chosen to annihilate additional BCH terms. These schemes
+    form a recursive family generating arbitrarily high order from a base
+    symmetric integrator.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-2-5">6.2.5 Symmetric Composition for Splitting Methods</h3>
+
+  <p>
+    When the base integrator \(\Psi_h\) is itself a splitting, such as Strang:
+  </p>
+
+  <p class="math">
+    \[
+      \Psi_h = \varphi_{h/2}^{[1]} \circ \varphi_h^{[2]} \circ \varphi_{h/2}^{[1]},
+    \tag{6.2.8}
+    \]
+  </p>
+
+  <p>
+    the Yoshida and Suzuki compositions give high-order <em>splitting methods</em>.
+    For example, the 4th-order symmetric splitting obtained from Strang is:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{(4)}
+      =
+      \Phi_{\alpha h}^{\mathrm{S}}
+      \circ 
+      \Phi_{\beta h}^{\mathrm{S}}
+      \circ 
+      \Phi_{\alpha h}^{\mathrm{S}},
+    \tag{6.2.9}
+    \]
+  </p>
+
+  <p>
+    which expands (after substituting the Strang components) into
+    a 7-factor composition of subflows \(\varphi^{[1]}\) and \(\varphi^{[2]}\).
+  </p>
+
+  <p>
+    These high-order splittings are widely used in:
+  </p>
+
+  <ul>
+    <li>quantum chemistry (time propagation of Schrödinger equations),</li>
+    <li>molecular dynamics,</li>
+    <li>celestial mechanics and perturbed Kepler problems,</li>
+    <li>long-time Hamiltonian simulations,</li>
+    <li>time-splitting methods for nonlinear Schrödinger and KdV equations.</li>
+  </ul>
+
+  <hr/>
+
+  <h3 id="sec-6-2-6">6.2.6 Geometric Benefits of Symmetric Composition</h3>
+
+  <p>
+    Symmetric compositions retain:
+  </p>
+
+  <ul>
+    <li><strong>Symplecticity</strong> (if the base method is symplectic),</li>
+    <li><strong>Time reversibility</strong>,</li>
+    <li><strong>Volume preservation</strong> if applicable,</li>
+    <li>
+      <strong>Excellent long-time behaviour</strong> via a modified Hamiltonian
+      of the form
+      \[
+        \tilde{H}
+        =
+        H + h^{2} H_2 + h^{4} H_4 + \cdots.
+      \]
+    </li>
+  </ul>
+
+  <p>
+    High-order symplectic compositions are often competitive with (or superior
+    to) high-order Runge–Kutta methods because the dominant error terms in
+    Hamiltonian problems are often <em>commutators</em>, which compositions
+    suppress efficiently.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-2-7">6.2.7 Summary and References for 6.2</h3>
+
+  <p>
+    In this section we developed the general framework of symmetric composition
+    methods. Starting from a symmetric base integrator (typically Strang), one
+    can construct high-order geometric integrators using Yoshida triple-jumps,
+    Suzuki fractal compositions, or more general optimized compositions.
+  </p>
+
+  <p>
+    Key takeaways:
+  </p>
+
+  <ul>
+    <li>Symmetry → cancellation of odd BCH terms → only even orders appear.</li>
+    <li>Yoshida’s method raises order by 2 each iteration.</li>
+    <li>Complexity grows slowly: many high-order methods require few stages.</li>
+    <li>Schemes preserve symplecticity, reversibility, and invariants.</li>
+    <li>These methods underpin modern Hamiltonian integrators, quantum simulations,
+      and high-accuracy PDE solvers.</li>
+  </ul>
+
+  <h4>References</h4>
+  <ol>
+    <li>
+      H. Yoshida, “Construction of higher order symplectic integrators,”
+      <em>Phys. Lett. A</em>, 150(5–7):262–268, 1990.
+    </li>
+    <li>
+      M. Suzuki, “General theory of fractal path integrals,”
+      <em>Phys. Lett. A</em>, 146:319–323, 1991.
+    </li>
+    <li>
+      E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration</em>, Springer, 2006.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-6-3">
+
+  <h2>6.3 Optimised High-Order Splitting Methods: Real &amp; Complex Coefficients</h2>
+
+  <p>
+    Classical symmetric compositions (Strang, Yoshida, Suzuki) generate
+    high-order methods with universal algebraic rules, but they are rarely
+    <em>optimal</em> for a specific class of problems. In this section we
+    present the modern theory of <strong>optimised splitting schemes</strong>,
+    including:
+  </p>
+
+  <ul>
+    <li>minimal-stage real-coefficient methods,</li>
+    <li>complex-coefficient splittings for high and arbitrary order,</li>
+    <li>positivity constraints (important for diffusion-type PDEs),</li>
+    <li>energy-optimised Hamiltonian integrators,</li>
+    <li>nearly-optimal schemes for quantum and semiclassical dynamics.</li>
+  </ul>
+
+  <p>
+    These methods represent the contemporary <em>state-of-the-art</em> and often
+    outperform all traditional splitting schemes for demanding applications.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-3-1">6.3.1 The Algebraic Order Barrier for Real Coefficients</h3>
+
+  <p>
+    Consider symmetric splitting of a two-part system:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h = 
+      \prod_{j=1}^{s} 
+        \exp(a_j h F^{[1]})
+        \exp(b_j h F^{[2]}),
+    \]
+  </p>
+
+  <p>
+    with the <strong>symmetry</strong> constraint
+  </p>
+
+  <p class="math">
+    \[
+      a_j = a_{s+1-j}, \qquad b_j = b_{s+1-j}.
+    \tag{6.3.1}
+    \]
+  </p>
+
+  <p>
+    The BCH expansion of <span class="math">\(\log \Phi_h\)</span> contains commutators
+    \[
+      [F^{[1]},F^{[2]}], \quad
+      [F^{[1]},[F^{[1]},F^{[2]}]], \quad \dots
+    \]
+    and the order conditions require vanishing of specific linear combinations
+    of these.
+  </p>
+
+  <p>
+    <strong>Key barrier (Sheng 1989, Suzuki 1991):</strong>
+  </p>
+
+  <blockquote>
+    <em>No symmetric splitting of order higher than 2 exists with all real
+    coefficients \(a_j, b_j \ge 0\).</em>
+  </blockquote>
+
+  <p>
+    In particular:
+  </p>
+
+  <ul>
+    <li>4th-order real symmetric splittings <em>must</em> include negative
+        coefficients,</li>
+    <li>this is catastrophic for diffusion/parabolic PDEs, since \(\exp(-|h|A)\)
+        can blow up when \(A\) is negative semidefinite.</li>
+  </ul>
+
+  <p>
+    Thus:
+  </p>
+
+  <ul>
+    <li><strong>Real-coefficient splittings</strong> are ideal for Hamiltonian 
+      (conservative) flows.</li>
+    <li><strong>Complex-coefficient splittings</strong> are essential for 
+      Schrödinger equations, semiclassical systems, and general non-parabolic 
+      PDEs.</li>
+  </ul>
+
+  <hr/>
+
+  <h3 id="sec-6-3-2">6.3.2 Minimal-Stage Real-Coefficient Splittings (Optimised)</h3>
+
+  <p>
+    High-order real-coefficient splittings are constructed by solving the
+    BCH order conditions while <em>minimising either</em>:
+  </p>
+
+  <ul>
+    <li>the number of stages,</li>
+    <li>the error constant,</li>
+    <li>the sum of absolute coefficients,</li>
+    <li>energy error over long time (Hamiltonian optimisation).</li>
+  </ul>
+
+  <h4>Fourth-order optimised real splitting (McLachlan 1995)</h4>
+
+  <p>
+    A minimal 4th-order symmetric scheme exists with
+    <strong>three exponentials of each operator</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h^{(4)}
+      = 
+      e^{a_1 h F^{[1]}}
+      e^{b_1 h F^{[2]}}
+      e^{a_2 h F^{[1]}}
+      e^{b_1 h F^{[2]}}
+      e^{a_1 h F^{[1]}}.
+    \tag{6.3.2}
+    \]
+  </p>
+
+  <p>
+    with coefficients
+  </p>
+
+  <p class="math">
+    \[
+      a_1 = \frac{1}{2 - 2^{1/3}}, 
+      \qquad
+      a_2 = -\frac{2^{1/3}}{2 - 2^{1/3}},
+    \]
+    \[
+      b_1 = \frac{1}{2}.
+    \tag{6.3.3}
+    \]
+  </p>
+
+  <p>
+    These are Yoshida's coefficients but optimised variants exist where the 
+    <em>error constant is minimised</em> (e.g., McLachlan’s 1995 scheme).
+  </p>
+
+  <p class="task">
+    Task marker: Section 6.4 derives optimal real splittings for 
+    Hamiltonian dynamics using backward error analysis and modified
+    Hamiltonians.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-3-3">6.3.3 Complex-Coefficient Splittings for High and Arbitrary Order</h3>
+
+  <p>
+    Allowing <strong>complex coefficients</strong> dramatically changes the landscape:
+  </p>
+
+  <ul>
+    <li>complex coefficients circumvent the Sheng–Suzuki real-positivity barrier,</li>
+    <li>arbitrarily high order is possible without negative <em>real</em> parts,</li>
+    <li>splittings become extremely efficient for Schrödinger and semiclassical problems.</li>
+  </ul>
+
+  <h4>General complex symmetric splitting</h4>
+
+  <p class="math">
+    \[
+      \Phi_h
+      =
+      \prod_{j=1}^s
+      \exp(a_j h F^{[1]})
+      \exp(b_j h F^{[2]}),
+    \tag{6.3.4}
+    \]
+  </p>
+
+  <p>
+    where now
+    \[
+      a_j, b_j \in \mathbb{C}, 
+      \qquad
+      \Re(a_j), \Re(b_j) \ge 0.
+    \]
+  </p>
+
+  <p>
+    These schemes are stable for:
+  </p>
+
+  <ul>
+    <li>Schrödinger PDEs (unitarity preserved exactly),</li>
+    <li>linear operators with purely imaginary spectrum,</li>
+    <li>nonlinear NLS, Gross–Pitaevskii, Dirac equations.</li>
+  </ul>
+
+  <h4>Example: 4th-order complex scheme with all positive real parts</h4>
+
+  <p>
+    The Blanes–Casas “C4” scheme:
+  </p>
+
+  <p class="math">
+    \[
+      a_1 = 0.5 + 0.28867513459 i, \qquad 
+      a_2 = 0.5 - 0.28867513459 i,
+    \tag{6.3.5}
+    \]
+  </p>
+
+  <p>
+    yields a 4th-order splitting with only two exponentials of each operator,
+    outperforming all real-coefficient schemes in quantum applications.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-3-4">6.3.4 Positivity Constraints for Parabolic PDEs</h3>
+
+  <p>
+    For diffusion or parabolic systems:
+  </p>
+
+  <p class="math">
+    \[
+      \dot{u} = A u + B u,
+    \]
+  </p>
+
+  <p>
+    the operator \( e^{a_j h A} \) must satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      \Re(a_j) \ge 0,
+      \qquad
+      \Re(b_j) \ge 0,
+    \tag{6.3.6}
+    \]
+  </p>
+
+  <p>
+    otherwise the method is unstable. Therefore:
+  </p>
+
+  <ul>
+    <li>High-order real-coefficient splittings are impossible,</li>
+    <li>Complex-coefficient splittings with positive real parts are the only viable solution.</li>
+  </ul>
+
+  <h4>SOTA: Blanes–Casas optimal CFM splittings for parabolic PDEs</h4>
+
+  <p>
+    They constructed 4th, 6th, and 8th-order splitting schemes with <strong>all
+    coefficients in the right half-plane</strong>. These dominate the field in
+    smoothing-dominated PDEs.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-3-5">6.3.5 Energy-Optimised Splittings for Hamiltonian Systems</h3>
+
+  <p>
+    For Hamiltonian systems with 
+    \(H = T(p) + V(q)\), the goal is to minimise:
+  </p>
+
+  <ul>
+    <li>modified Hamiltonian error,</li>
+    <li>shadow energy drift,</li>
+    <li>commutator magnitude 
+      \( [T,[T,V]] \), \( [V,[T,V]] \), etc.</li>
+  </ul>
+
+  <p>
+    These yield:
+  </p>
+
+  <ul>
+    <li><strong>Omelyan–Mryglod–Folk (OMF) integrators</strong> (4th order): widely used in lattice QCD.</li>
+    <li><strong>Chin’s force-gradient splittings</strong>: incorporate derivatives of forces for high accuracy.</li>
+    <li><strong>Optimised 6th–8th order Hamiltonian splittings</strong>
+        (Blanes–Casas–Sanz-Serna).</li>
+  </ul>
+
+  <p class="math">
+    \[
+      \Phi_h^{\mathrm{OMF}}
+      =
+      e^{\lambda h B}
+      e^{\frac{1}{2} h A}
+      e^{(1-2\lambda) h B}
+      e^{\frac{1}{2} h A}
+      e^{\lambda h B},
+    \tag{6.3.7}
+    \]
+  </p>
+
+  <p>
+    with 
+    \(\lambda \approx 0.1931833275\),
+    which dramatically reduces energy drift.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-3-6">6.3.6 Summary and References for 6.3</h3>
+
+  <p>
+    This section presented the full modern landscape of optimised splittings:
+  </p>
+
+  <ul>
+    <li><strong>Real-coefficient methods</strong>: must include negatives; ideal for Hamiltonian flows.</li>
+    <li><strong>Complex-coefficient methods</strong>: allow arbitrarily high order with stability.</li>
+    <li><strong>Positivity constraints</strong>: crucial for parabolic PDEs.</li>
+    <li><strong>Energy-optimised splittings</strong>: leading methods for long-time Hamiltonian work.</li>
+    <li>The SOTA schemes (Blanes–Casas, Suzuki, McLachlan, Shin–Chin, OMF) outperform
+        classical compositions in almost every demanding application.</li>
+  </ul>
+
+  <h4>References</h4>
+
+  <ol>
+    <li>
+      S. Blanes, F. Casas, J.A. Oteo, J. Ros,
+      <em>The Magnus Expansion and Some of its Applications</em>,
+      Physics Reports 470, 2009.
+    </li>
+    <li>
+      R.I. McLachlan, “On the optimality of symplectic integrators,”
+      <em>SIAM J. Sci. Comput.</em>, 16, 1995.
+    </li>
+    <li>
+      M. Suzuki, “Fractal decompositions,” J. Math. Phys., 1990–1991 series.
+    </li>
+    <li>
+      M. Omelyan, I. Mryglod, R. Folk,
+      <em>Optimized Forest–Ruth- and Suzuki-type symplectic integrators</em>,
+      Computer Physics Communications, 2002–2003.
+    </li>
+    <li>
+      S. Blanes, F. Casas, <em>A Concise Introduction to GNI</em>, 2e, CRC, 2026.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-6-4">
+
+  <h2>6.4 Backward Error Analysis for Splitting Methods</h2>
+
+  <p>
+    Backward error analysis (BEA) provides the fundamental theoretical 
+    explanation for the excellent long-time behaviour of geometric integrators.
+    Rather than analysing the discrete numerical flow directly, BEA interprets
+    a numerical scheme as the <strong>exact flow of a modified differential
+    equation</strong>:
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h = \exp\!\big(h \tilde{F}(h)\big),
+    \]
+  </p>
+
+  <p>
+    where the <em>modified vector field</em> admits a formal series expansion
+    \[
+      \tilde{F}(h)
+      = 
+      F
+      + h F_2
+      + h^2 F_3
+      + h^3 F_4
+      + \cdots.
+    \]
+    For geometric methods—especially symplectic mappings—the modified system
+    inherits the geometric structure (e.g.~Hamiltonian geometry) to all orders
+    in \(h\).
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-4-1">6.4.1 Modified Vector Fields from BCH Theory</h3>
+
+  <p>
+    Consider a splitting integrator for an autonomous system
+  </p>
+
+  <p class="math">
+    \[
+      y' = (A + B)(y).
+    \tag{6.4.1}
+    \]
+  </p>
+
+  <p>
+    A general splitting has the form
+  </p>
+
+  <p class="math">
+    \[
+      \Phi_h
+      =
+      \prod_{j=1}^s 
+      \exp(a_j h A)\, \exp(b_j h B).
+    \tag{6.4.2}
+    \]
+  </p>
+
+  <p>
+    The Baker–Campbell–Hausdorff expansion provides
+  </p>
+
+  <p class="math">
+    \[
+      \log(\Phi_h)
+      =
+      h(A+B)
+      + h^2 \alpha_1[A,B]
+      + h^3\big(\alpha_2[A,[A,B]] + \alpha_3[B,[A,B]]\big)
+      + h^4 \cdots.
+    \tag{6.4.3}
+    \]
+  </p>
+
+  <p>
+    Let the modified vector field be defined by
+  </p>
+
+  <p class="math">
+    \[
+      h\tilde{F}(h) = \log(\Phi_h).
+    \]
+  </p>
+
+  <p>
+    Then
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{F}(h)
+      =
+      A + B
+      + h \alpha_1[A,B]
+      + h^2\big(\alpha_2[A,[A,B]] + \alpha_3[B,[A,B]]\big)
+      + h^3(\cdots).
+    \tag{6.4.4}
+    \]
+  </p>
+
+  <p>
+    Each coefficient \(\alpha_k\) is a known polynomial in the splitting
+    coefficients \(a_j, b_j\). Setting these equal to zero yields the order
+    conditions. Optimised splittings (Section 6.3) choose them to minimise the
+    leading error terms in the modified system.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-4-2">6.4.2 Geometric Structure of the Modified System</h3>
+
+  <p>
+    If the original system is Hamiltonian with 
+    \[
+      A = X_T, \qquad B = X_V,
+    \]
+    then all nested commutators of \(A\) and \(B\) are Hamiltonian vector 
+    fields. Thus the modified vector field is Hamiltonian:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{F}(h) = X_{\tilde{H}}, 
+    \]
+  </p>
+
+  <p>
+    where the modified Hamiltonian admits the expansion
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{H}
+      =
+      H
+      +
+      h^2 H_2
+      +
+      h^4 H_4
+      +
+      h^6 H_6
+      +
+      \cdots.
+    \tag{6.4.5}
+    \]
+  </p>
+
+  <p>
+    For <strong>symmetric</strong> (time-reversible) methods, all odd-index 
+    terms vanish:
+  </p>
+
+  <p class="math">
+    \[
+      H_{2k+1} = 0.
+    \]
+  </p>
+
+  <p>
+    Thus Strang and all symmetric compositions preserve (to very high accuracy)
+    an even-order approximation of the true Hamiltonian, which explains their
+    exceptional long-time energy conservation.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-4-3">6.4.3 Long-Time Behavior and Near-Conservation Laws</h3>
+
+  <p>
+    For symplectic integrators, BEA yields the “shadow energy” theorem:
+  </p>
+
+  <blockquote>
+    <em>If \( \Phi_h \) is symplectic, then it exactly preserves the modified 
+    Hamiltonian \( \tilde{H} \) for exponentially long times
+    \( T = \mathcal{O}(e^{c/h}) \), provided the solution remains in a compact set.</em>
+  </blockquote>
+
+  <p>
+    In practice:
+  </p>
+
+  <ul>
+    <li>
+      The numerical energy oscillates around a quasi-constant value with 
+      amplitude \( \mathcal{O}(h^p) \).
+    </li>
+    <li>
+      No secular (linear) drift occurs, in contrast to non-symplectic methods.
+    </li>
+    <li>
+      Stability properties of the true system (e.g. boundedness, periodicity) are
+      preserved for extremely long times.
+    </li>
+  </ul>
+
+  <p>
+    This explains why symplectic integrators dominate long-time molecular
+    dynamics, celestial mechanics, and semiclassical quantum simulations.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-4-4">6.4.4 Backward Error and Optimisation of Splitting Coefficients</h3>
+
+  <p>
+    The leading term in the modified Hamiltonian for a symmetric splitting is
+  </p>
+
+  <p class="math">
+    \[
+      H_2
+      =
+      \alpha_{21}\{T,\{T,V\}\}
+      +
+      \alpha_{22}\{V,\{T,V\}\}.
+    \tag{6.4.6}
+    \]
+  </p>
+
+  <p>
+    The constants \( \alpha_{2j} \) encode the leading error of the scheme.
+    Modern optimised splittings (Eqs.~(6.3.7) and others) choose coefficients to:
+  </p>
+
+  <ul>
+    <li>minimise \( \|H_2\| \) in an appropriate norm,</li>
+    <li>or cancel selected contributions selectively,</li>
+    <li>or minimise the leading commutator contribution 
+        \( [A,[A,B]] + [B,[B,A]] \),</li>
+    <li>or optimise the average energy drift over one period of a reference orbit.</li>
+  </ul>
+
+  <p>
+    For example, the Omelyan–Mryglod–Folk (OMF) parameter 
+    \( \lambda \approx 0.1931833275 \) is chosen to minimise the modified energy
+    error in lattice QCD simulations.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-4-5">6.4.5 BEA for Complex-Coefficient Splittings</h3>
+
+  <p>
+    For complex splitting coefficients 
+    \(a_j, b_j \in \mathbb{C}\) with
+    \( \Re(a_j), \Re(b_j) \ge 0 \),
+    the modified vector field remains well-defined and admits the same BCH
+    expansion (6.4.4).
+  </p>
+
+  <p>
+    If the original system is Hamiltonian but the complex step destroys exact
+    symplecticity of each subflow (e.g. for real canonical variables), the method
+    is usually interpreted in a complexified phase space. For Schrödinger-type
+    PDEs, complex coefficients preserve unitarity exactly, and BEA yields a
+    modified Hamiltonian which is anti-Hermitian:
+  </p>
+
+  <p class="math">
+    \[
+      \tilde{H}
+      = H + h^2 H_2 + h^4 H_4 + \cdots,
+    \qquad
+    \tilde{H}^\dagger = -\tilde{H}.
+    \tag{6.4.7}
+    \]
+  </p>
+
+  <p>
+    This ensures exact preservation of \( \|\psi(t)\|_{L^2} \) for highly accurate
+    quantum time propagation.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-4-6">6.4.6 Resonances and Limitations of BEA</h3>
+
+  <p>
+    Although BEA is asymptotically valid, it breaks down when:
+  </p>
+
+  <ul>
+    <li>the solution approaches a singularity,</li>
+    <li>the modified Hamiltonian series fails to converge (typical for chaotic systems),</li>
+    <li>
+      resonance occurs, i.e.~when the numerical frequency approximates a rational
+      multiple of true frequencies:
+      \[
+        k \omega(h) \approx n \Omega
+      \]
+      for integers \(k, n\).  
+      This leads to the well-known <strong>nonlinear resonance instability</strong>.
+    </li>
+  </ul>
+
+  <p>
+    High-order optimized splittings typically shift the dominant resonance tongues
+    to higher order in \(h\), improving practical stability.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-4-7">6.4.7 Summary and References for 6.4</h3>
+
+  <p>Key facts established in this section:</p>
+
+  <ul>
+    <li>
+      BEA interprets numerical splittings as exact flows of a modified system:
+      \[
+        y' = \tilde{F}(h)(y).
+      \]
+    </li>
+    <li>For Hamiltonian systems, \( \tilde{F}(h) = X_{\tilde{H}} \) is Hamiltonian.</li>
+    <li>
+      Modified Hamiltonians have expansions containing only even powers for 
+      symmetric methods.
+    </li>
+    <li>
+      Long-time near-conservation of energy follows naturally from modified 
+      Hamiltonians.
+    </li>
+    <li>
+      BEA drives the design of optimised splittings, including OMF, Chin, 
+      and the Blanes–Casas families.
+    </li>
+  </ul>
+
+  <h4>References</h4>
+
+  <ol>
+    <li>
+      E. Hairer, C. Lubich, G. Wanner, 
+      <em>Geometric Numerical Integration</em>, Springer, 2006.
+    </li>
+    <li>
+      S. Blanes, F. Casas, <em>A Concise Introduction to GNI</em>, CRC, 2026.
+    </li>
+    <li>
+      R.I. McLachlan, G.R.W. Quispel, 
+      “Splitting Methods,” Acta Numer., 11 (2002), 341–434.
+    </li>
+    <li>
+      M. Omelyan, I. Mryglod, R. Folk, 
+      <em>Computer Physics Communications</em>, 2002–2003 series.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-6-5">
+
+  <h2>6.5 Splitting Methods for PDEs</h2>
+
+  <p>
+    Splitting schemes extend naturally from finite-dimensional ODEs to 
+    evolution PDEs. Many PDEs can be written in the semilinear form
+  </p>
+
+  <p class="math">
+    \[
+      u_t = A u + B(u),
+    \tag{6.5.1}
+    \]
+  </p>
+
+  <p>
+    where <strong>A</strong> is a (typically linear, stiff) operator generating a 
+    strongly continuous semigroup, and <strong>B</strong> is a (possibly nonlinear) 
+    locally Lipschitz operator. If the flows of \(A\) and \(B\) are explicitly 
+    computable or efficiently approximable, splitting schemes yield
+    <em>structure-preserving, high-accuracy time integrators</em>.
+  </p>
+
+  <p>
+    This section develops the rigorous theory and SOTA implementations for
+    splitting methods applied to:
+  </p>
+
+  <ul>
+    <li>Schrödinger equations (linear and nonlinear),</li>
+    <li>heat and diffusion equations,</li>
+    <li>Klein–Gordon and wave equations,</li>
+    <li>Korteweg–de Vries (KdV) and dispersive PDEs,</li>
+    <li>Maxwell systems and electromagnetics.</li>
+  </ul>
+
+  <p>
+    The underlying functional-analytic framework uses semigroup theory, Fourier 
+    spectral discretization, and geometric properties of flows in infinite 
+    dimensions.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-5-1">6.5.1 Operator Semigroup Foundations</h3>
+
+  <p>
+    Let \(A: D(A)\subset X \to X\) be the generator of a 
+    \(C^0\)-semigroup \(e^{tA}\) on a Banach space \(X\). 
+    Let \(B: X \to X\) be locally Lipschitz so that the ODE 
+  </p>
+
+  <p class="math">
+    \[
+      u_t = B(u)
+    \tag{6.5.2}
+    \]
+  </p>
+
+  <p>
+    has a unique local flow \( \varphi_B^t\). Then the splitting schemes
+  </p>
+
+  <ul>
+    <li><strong>Lie–Trotter:</strong> \( \Phi_h = e^{hA} \varphi_B^{h} \)</li>
+    <li><strong>Strang:</strong> \( \Phi_h = e^{\frac{h}{2}A} \varphi_B^h e^{\frac{h}{2}A} \)</li>
+  </ul>
+
+  <p>
+    are well-defined on \(X\).  
+  </p>
+
+  <p>
+    Convergence follows from the classical theory:
+    if \(A+B\) generates a (mild or strong) solution semigroup, then the Lie and
+    Strang splittings converge with order 1 and 2 respectively under mild regularity assumptions.
+  </p>
+
+  <p class="math">
+    \[
+      \|\Phi_h^n u_0 - e^{nh(A+B)}u_0\|
+      \le C h^p,
+      \qquad p = 1~\text{(Lie)},\ 2~\text{(Strang)}.
+    \tag{6.5.3}
+    \]
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-5-2">6.5.2 Fourier–Spectral Splitting</h3>
+
+  <p>
+    Many PDEs have linear parts diagonalizable by Fourier transform.  
+    Let \( \mathcal{F} \) denote the Fourier transform, then:
+  </p>
+
+  <p class="math">
+    \[
+      A = \mathcal{F}^{-1} \Lambda(k)\, \mathcal{F},
+    \tag{6.5.4}
+    \]
+  </p>
+
+  <p>
+    so that its flow is exactly computable:
+  </p>
+
+  <p class="math">
+    \[
+      e^{tA} u = \mathcal{F}^{-1} \big( e^{t\Lambda(k)} \hat{u}(k) \big).
+    \tag{6.5.5}
+    \]
+  </p>
+
+  <p>
+    This leads to highly efficient splitting integrators:
+  </p>
+
+  <ul>
+    <li>linear part: FFT → phase multiplication → inverse FFT,</li>
+    <li>nonlinear part: pointwise evaluation in physical space.</li>
+  </ul>
+
+  <p>
+    This structure underlies spectral splittings for Schrödinger, NLS, KdV,
+    and dispersive PDEs.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-5-3">6.5.3 Splitting for Schrödinger Equations</h3>
+
+  <p>
+    Consider the linear Schrödinger equation
+  </p>
+
+  <p class="math">
+    \[
+      i\psi_t = -\frac{1}{2}\Delta \psi + V(x)\psi.
+    \tag{6.5.6}
+    \]
+  </p>
+
+  <p>
+    Define
+  </p>
+
+  <ul>
+    <li><strong>Kinetic operator</strong>: \(A = i\frac{1}{2}\Delta\),</li>
+    <li><strong>Potential operator</strong>: \(B\psi = -i V(x)\psi.\)</li>
+  </ul>
+
+  <p>
+    Both flows are exactly computable:
+  </p>
+
+  <p class="math">
+    \[
+      e^{tA}\psi 
+      = \mathcal{F}^{-1}\left( e^{-i t |k|^2/2} \hat{\psi}(k)\right),
+    \tag{6.5.7}
+    \]
+  </p>
+
+  <p class="math">
+    \[
+      e^{tB}\psi = e^{-i t V(x)} \psi(x).
+    \tag{6.5.8}
+    \]
+  </p>
+
+  <p>
+    Thus Strang splitting gives a unitary, second-order, time-reversible method.
+    High-order <em>complex-coefficient</em> splittings (Section 6.3) are widely used 
+    in quantum chemistry and semiclassical dynamics.
+  </p>
+
+  <h4>Nonlinear Schrödinger equation (NLS)</h4>
+
+  <p>
+    For
+  </p>
+
+  <p class="math">
+    \[
+      i \psi_t = -\frac{1}{2}\Delta \psi + g|\psi|^2\psi,
+    \tag{6.5.9}
+    \]
+  </p>
+
+  <p>
+    the nonlinear flow is
+  </p>
+
+  <p class="math">
+    \[
+      \varphi_B^t(\psi)
+      = e^{-i g t |\psi(x)|^2} \psi(x),
+    \tag{6.5.10}
+    \]
+  </p>
+
+  <p>
+    which preserves mass <em>exactly</em>.  
+    Strang and higher-order splittings preserve:
+  </p>
+
+  <ul>
+    <li>unitarity,</li>
+    <li>mass,</li>
+    <li>time reversibility,</li>
+    <li>modified energy (via BEA).</li>
+  </ul>
+
+  <p>
+    These are state-of-the-art and standard in Gross–Pitaevskii solvers and
+    Bose–Einstein condensate simulations.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-5-4">6.5.4 Heat and Parabolic Equations: Positivity Issues</h3>
+
+  <p>
+    For parabolic systems:
+  </p>
+
+  <p class="math">
+    \[
+      u_t = \Delta u + B(u),
+    \tag{6.5.11}
+    \]
+  </p>
+
+  <p>
+    the semigroup \(e^{t\Delta}\) is contractive only for \(t\ge 0\).
+    Therefore splitting coefficients must satisfy:
+  </p>
+
+  <p class="math">
+    \[
+      \Re(a_j) \ge 0, \qquad \Re(b_j) \ge 0.
+    \tag{6.5.12}
+    \]
+  </p>
+
+  <p>
+    Real-coefficient high-order splittings require negative coefficients
+    (Sheng–Suzuki barrier), which are unstable for diffusion.
+  </p>
+
+  <p>
+    Thus modern high-order solvers for parabolic PDEs use:
+  </p>
+
+  <ul>
+    <li><strong>complex-coefficient splittings with positive real parts</strong>
+        (Blanes–Casas CFM schemes),</li>
+    <li><strong>exponential integrators</strong> (Section 7),</li>
+    <li><strong>IMEX schemes</strong> for stiff linear parts.</li>
+  </ul>
+
+  <hr/>
+
+  <h3 id="sec-6-5-5">6.5.5 KdV, Dispersive and Nonlinear Wave Equations</h3>
+
+  <p>
+    For KdV:
+  </p>
+
+  <p class="math">
+    \[
+      u_t + 6 uu_x + u_{xxx} = 0,
+    \tag{6.5.13}
+    \]
+  </p>
+
+  <p>
+    split into:
+  </p>
+
+  <ul>
+    <li><strong>Linear dispersive part</strong>:
+      \(
+        A u = -u_{xxx}
+      \)
+      with flow 
+      \[
+        e^{tA}\hat{u}(k)
+        = e^{i k^3 t} \hat{u}(k),
+      \]
+    </li>
+    <li><strong>Burgers-type nonlinear flow</strong>:
+      \(
+        B(u) = -6u u_x
+      \)
+      with flow given implicitly by solving the Hopf equation characteristic ODE.
+    </li>
+  </ul>
+
+  <p>
+    The combination via Strang splitting yields a highly effective scheme used in
+    soliton dynamics, dispersive shock wave, and Whitham modulation simulations.
+  </p>
+
+  <h4>Klein–Gordon and wave equations</h4>
+
+  <p>
+    For the Klein–Gordon equation:
+  </p>
+
+  <p class="math">
+    \[
+      u_{tt} = \Delta u - m^2 u - f(u),
+    \tag{6.5.14}
+    \]
+  </p>
+
+  <p>
+    rewrite as a first-order Hamiltonian system in Fourier space:
+  </p>
+
+  <p class="math">
+    \[
+      \frac{d}{dt}
+      \begin{pmatrix}
+      u \\ v
+      \end{pmatrix}
+      =
+      \begin{pmatrix}
+      v \\
+      \Delta u - m^2 u
+      \end{pmatrix}
+      + 
+      \begin{pmatrix}
+      0 \\ -f(u)
+      \end{pmatrix}.
+    \tag{6.5.15}
+    \]
+  </p>
+
+  <p>
+    Linear part diagonalises in Fourier space; nonlinear part is pointwise.
+    High-order splittings with FFTs are state-of-the-art for nonlinear wave
+    propagation, spectral radiation studies, and weak turbulence.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-5-6">6.5.6 Maxwell Equations and Electromagnetic Splitting</h3>
+
+  <p>
+    Maxwell’s equations (in vacuum):
+  </p>
+
+  <p class="math">
+    \[
+      \partial_t E = \nabla\times H,
+      \qquad
+      \partial_t H = -\nabla\times E.
+    \tag{6.5.16}
+    \]
+  </p>
+
+  <p>
+    preserve:
+  </p>
+
+  <ul>
+    <li>energy</li>
+    <li>divergence constraints</li>
+    <li>skew-symmetry of the generator</li>
+  </ul>
+
+  <p>
+    Splitting into:
+  </p>
+
+  <ul>
+    <li>\(A\): evolution under curl of \(E\),</li>
+    <li>\(B\): evolution under curl of \(H\),</li>
+  </ul>
+
+  <p>
+    yields symplectic, structure-preserving methods suitable for:
+  </p>
+
+  <ul>
+    <li>computational electromagnetics,</li>
+    <li>photonic crystals,</li>
+    <li>meta-material modelling,</li>
+    <li>optical solitons and nonlinear Maxwell models.</li>
+  </ul>
+
+  <hr/>
+
+  <h3 id="sec-6-5-7">6.5.7 Summary and References for 6.5</h3>
+
+  <p>Key takeaways:</p>
+
+  <ul>
+    <li>Splitting methods extend naturally to semilinear PDEs via semigroup theory.</li>
+    <li>Fourier–spectral methods + splitting = state-of-the-art for dispersive PDEs.</li>
+    <li>Schrödinger and NLS equations benefit most from complex-coefficient splittings.</li>
+    <li>Parabolic PDEs require positivity → complex coefficients are essential.</li>
+    <li>Wave, Klein–Gordon, Maxwell, and KdV systems all admit efficient split flows.</li>
+  </ul>
+
+  <h4>References</h4>
+
+  <ol>
+    <li>
+      Hairer, Lubich, Wanner, <em>Geometric Numerical Integration</em>, 2006.
+    </li>
+    <li>
+      Blanes &amp; Casas, <em>A Concise Introduction to GNI</em>, 2ed, CRC, 2026.
+    </li>
+    <li>
+      Bao, Jin, and Markowich, 
+      “Numerical methods for the nonlinear Schrödinger equation,” 
+      <em>SIAM Review</em>, 2013.
+    </li>
+    <li>
+      Holden, Karlsen, Risebro &amp; Tao,
+      <em>Splitting Methods for PDEs</em>, EMS 2011.
+    </li>
+  </ol>
+
+</section>
+
+<section id="sec-6-6">
+
+  <h2>6.6 Relation of Splitting to Magnus Methods and Exponential Integrators</h2>
+
+  <p>
+    Splitting and composition methods, Magnus integrators, and exponential
+    integrators all arise from the same operator-theoretic viewpoint:
+    approximate the evolution operator of a differential equation by structured
+    exponentials of simpler pieces. This section explains their common
+    algebraic backbone and clarifies when each class is preferable.
+  </p>
+
+  <p>
+    We focus on:
+  </p>
+
+  <ol>
+    <li>The shared operator framework for autonomous and non-autonomous problems,</li>
+    <li>Magnus expansion as a “logarithm” of products of exponentials (splittings),</li>
+    <li>Commutator-free Magnus (CFM) schemes as high-order composition methods,</li>
+    <li>The link to exponential integrators for semilinear systems,</li>
+    <li>Hybrid geometric schemes that combine these tools in practice.</li>
+  </ol>
+
+  <hr/>
+
+  <h3 id="sec-6-6-1">6.6.1 Common Operator Framework</h3>
+
+  <p>
+    Consider a linear (possibly time-dependent) evolution equation on a Banach space
+    \(X\):
+  </p>
+
+  <p class="math">
+    \[
+      u'(t) = A(t) u(t), \qquad u(t) \in X,
+    \]
+  </p>
+
+  <p>
+    where \(A(t)\) is a (possibly unbounded) linear operator generating an
+    evolution family \(U(t,s)\) such that
+  </p>
+
+  <p class="math">
+    \[
+      u(t) = U(t,s) u(s), \qquad U(t,s) U(s,r) = U(t,r),\quad U(s,s)=I.
+    \]
+  </p>
+
+  <p>
+    <strong>Magnus viewpoint.</strong>  
+    For sufficiently regular \(A(t)\), we may write
+  </p>
+
+  <p class="math">
+    \[
+      U(t,s) = \exp\big(\Omega(t,s)\big),
+    \]
+  </p>
+
+  <p>
+    where \(\Omega(t,s)\) is given by the <em>Magnus expansion</em>, an infinite
+    series of time integrals of nested commutators of \(A(\tau)\). Truncating
+    \(\Omega\) yields <em>Magnus integrators</em>.
+  </p>
+
+  <p>
+    <strong>Splitting viewpoint.</strong>  
+    When \(A\) decomposes into simpler pieces,
+  </p>
+
+  <p class="math">
+    \[
+      A(t) = A_1(t) + A_2(t) + \cdots + A_m(t),
+    \]
+  </p>
+
+  <p>
+    whose flows (or exponentials) can be computed efficiently, we approximate
+    \(U(t,s)\) by compositions of exponentials of the sub-operators,
+    e.g. Lie–Trotter or Strang splittings over a time step \(h\).
+  </p>
+
+  <p>
+    <strong>Exponential integrator viewpoint.</strong>  
+    For semilinear systems
+  </p>
+
+  <p class="math">
+    \[
+      u'(t) = A u(t) + g(t, u(t)),
+    \]
+  </p>
+
+  <p>
+    exponential integrators treat \(e^{hA}\) exactly (or nearly so) and approximate
+    the contribution of the nonlinearity \(g\) via \(\varphi\)-functions and
+    quadrature. These methods can be interpreted as Magnus-/splitting-type
+    approximations in the variation-of-constants formula.
+  </p>
+
+  <p>
+    In all three cases, the core object is the exponential of an operator
+    (or sum of operators) and its algebra under composition, governed by the
+    Baker–Campbell–Hausdorff (BCH) and Magnus series.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-6-2">6.6.2 Magnus Expansion as the Logarithm of Splitting Schemes</h3>
+
+  <p>
+    For simplicity, consider an autonomous decomposition
+  </p>
+
+  <p class="math">
+    \[
+      A = A_1 + A_2
+    \]
+  </p>
+
+  <p>
+    and a splitting step over a time increment \(h\):
+  </p>
+
+  <p class="math">
+    \[
+      S(h) = e^{a_1 h A_1} e^{b_1 h A_2} e^{a_2 h A_1} e^{b_2 h A_2} \cdots
+      e^{a_s h A_1} e^{b_s h A_2}.
+    \tag{6.6.1}
+    \]
+  </p>
+
+  <p>
+    The BCH formula ensures that there exists an operator \(Z(h)\) such that
+  </p>
+
+  <p class="math">
+    \[
+      S(h) = \exp(Z(h)).
+    \]
+  </p>
+
+  <p>
+    Expanding \(Z(h)\) as a formal power series in \(h\) gives
+  </p>
+
+  <p class="math">
+    \[
+      Z(h) = h(A_1 + A_2)
+      + h^2 \alpha_1 [A_1, A_2]
+      + h^3 \big(
+        \alpha_2 [A_1,[A_1,A_2]]
+        + \alpha_3 [A_2,[A_1,A_2]]
+      \big)
+      + \cdots,
+    \tag{6.6.2}
+    \]
+  </p>
+
+  <p>
+    where the coefficients \(\alpha_j\) are polynomials in the composition
+    coefficients \(\{a_k, b_k\}\). The <strong>order conditions</strong> for the
+    splitting require that
+  </p>
+
+  <ul>
+    <li>
+      the linear term equals \(h(A_1 + A_2)\),
+    </li>
+    <li>
+      all terms up to order \(p\) in the commutator series match the logarithm
+      of the exact propagator \(e^{h(A_1+A_2)}\),
+    </li>
+    <li>
+      higher-order commutators contribute to the truncation error.
+    </li>
+  </ul>
+
+  <p>
+    Formally, \(Z(h)\) plays the same role as the <em>Magnus generator</em>
+    \(\Omega(h)\) for the exact flow. For an autonomous problem, the exact
+    Magnus generator is simply
+  </p>
+
+  <p class="math">
+    \[
+      \Omega(h) = h(A_1 + A_2),
+    \]
+  </p>
+
+  <p>
+    while for time-dependent problems \(A(t)\) the Magnus series contains time
+    integrals of commutators. In this sense:
+  </p>
+
+  <blockquote>
+    <em>Splitting methods can be viewed as particular approximations of the
+    Magnus generator by the BCH logarithm of a product of simpler exponentials.</em>
+  </blockquote>
+
+  <p>
+    The modern theory of <em>commutator-free Magnus integrators</em> makes this
+    connection explicit by designing products of exponentials whose BCH
+    logarithm reproduces a chosen truncated Magnus series.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-6-3">6.6.3 Commutator-Free Magnus (CFM) Methods as High-Order Compositions</h3>
+
+  <p>
+    For linear non-autonomous systems
+  </p>
+
+  <p class="math">
+    \[
+      u'(t) = A(t) u(t),
+    \]
+  </p>
+
+  <p>
+    the Magnus expansion over a step \([t_n,t_{n+1}] = [t_n, t_n+h]\) is
+  </p>
+
+  <p class="math">
+    \[
+      \Omega_n(h) = \int_{t_n}^{t_{n+1}} A(\tau)\, d\tau
+      - \frac{1}{2} \int_{t_n}^{t_{n+1}}\!\!\int_{t_n}^{\tau_1}
+        [A(\tau_1), A(\tau_2)]\, d\tau_2\, d\tau_1
+      + \cdots.
+    \tag{6.6.3}
+    \]
+  </p>
+
+  <p>
+    Classical Magnus integrators compute or approximate commutators like
+    \([A(\tau_1), A(\tau_2)]\), which may be expensive for large matrices
+    or operators.
+  </p>
+
+  <p>
+    <strong>Commutator-free Magnus (CFM) methods</strong> avoid explicit commutators by
+    using products of exponentials of linear combinations of <em>evaluations</em>
+    of \(A\) at quadrature nodes:
+  </p>
+
+  <p class="math">
+    \[
+      U_{n+1} = \prod_{j=1}^s
+        \exp\!\left(
+          h \sum_{\ell=1}^r \alpha_{j\ell} A(t_n + c_\ell h)
+        \right) U_n.
+    \tag{6.6.4}
+    \]
+  </p>
+
+  <p>
+    Here, \(c_\ell\) are quadrature nodes (e.g. Gauss–Legendre abscissas),
+    and the coefficients \(\alpha_{j\ell}\) are chosen so that the BCH logarithm
+    of this product matches the truncated Magnus series up to order \(p\).
+  </p>
+
+  <p>
+    From the perspective of Chapter 4, each factor
+    \(\exp(h \sum_\ell \alpha_{j\ell} A(t_n+c_\ell h))\) is simply another
+    <em>sub-flow</em> whose exponential can be applied efficiently
+    (e.g. via Krylov or FFT-based methods). The overall method is a
+    high-order <em>composition method</em> for the time-dependent generator.
+  </p>
+
+  <p>
+    Key properties:
+  </p>
+
+  <ul>
+    <li>
+      <strong>No explicit commutators.</strong> All operations are evaluations
+      and linear combinations of \(A(t)\), plus exponentials.
+    </li>
+    <li>
+      <strong>Structure preservation.</strong> If each \(\exp(\cdot)\) is
+      unitary or symplectic (e.g. skew-Hermitian matrices, Hamiltonian
+      matrices), then the full CFM method inherits unitarity or symplecticity.
+    </li>
+    <li>
+      <strong>High order.</strong> Existing schemes reach orders 4, 6, 8,
+      and beyond, with carefully optimized coefficients and quadratures.
+    </li>
+  </ul>
+
+  <p>
+    Thus CFM integrators can be seen as a SOTA synthesis of Magnus ideas
+    (logarithm of the evolution) and composition/splitting ideas
+    (products of exponentials of simpler pieces).
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-6-4">6.6.4 Exponential Integrators as Splitting/Magnus Approximations</h3>
+
+  <p>
+    For semilinear problems
+  </p>
+
+  <p class="math">
+    \[
+      u'(t) = A u(t) + g(t,u(t)),
+    \tag{6.6.5}
+    \]
+  </p>
+
+  <p>
+    the variation-of-constants formula gives
+  </p>
+
+  <p class="math">
+    \[
+      u(t_{n+1}) = e^{hA} u(t_n)
+      + \int_0^h e^{(h-\sigma)A} g(t_n + \sigma, u(t_n+\sigma))\, d\sigma.
+    \tag{6.6.6}
+    \]
+  </p>
+
+  <p>
+    Exponential Runge–Kutta and related exponential integrators approximate
+    the integral term via quadrature and replace \(u(t_n+\sigma)\) by internal
+    stage values. Typical schemes have the form
+  </p>
+
+  <p class="math">
+    \[
+      U_{n+1} = e^{hA} U_n
+      + h \sum_{j=1}^s \varphi_j(hA) G_j(U_n),
+    \tag{6.6.7}
+    \]
+  </p>
+
+  <p>
+    where the \(\varphi_j\) functions arise from integral representations
+    involving \(e^{(h-\sigma)A}\).
+  </p>
+
+  <p>
+    <strong>Relation to splitting.</strong>  
+    A simple Lie–Trotter splitting for (6.6.5) reads
+  </p>
+
+  <p class="math">
+    \[
+      U_{n+1}
+      = \varphi_g^h\!\big(e^{hA}U_n\big),
+    \]
+  </p>
+
+  <p>
+    where \(\varphi_g^h\) is the nonlinear flow generated by \(u' = g(t,u)\)
+    (with appropriate time freezing or time-labelling). Higher-order
+    Strang-type and composition splittings can be interpreted as particular
+    quadrature approximations of (6.6.6), just as exponential integrators do,
+    but organized as compositions of sub-flows rather than as direct
+    quadrature of the integral.
+  </p>
+
+  <p>
+    <strong>Relation to Magnus.</strong>  
+    If \(g\) is linear in \(u\), then the full generator \(A(t)\) of
+    (6.6.5) is linear, and Magnus/CFM schemes apply directly. For general
+    nonlinear \(g\), Magnus ideas still influence the design of exponential
+    integrators (e.g. time symmetry, commutator structure of linearized
+    operators, etc.), but require more care.
+  </p>
+
+  <p>
+    In practice:
+  </p>
+
+  <ul>
+    <li>
+      For <em>linear</em> or weakly nonlinear problems with strong time-dependence
+      (e.g. quantum dynamics with pulsed fields), Magnus and CFM methods are
+      often preferred.
+    </li>
+    <li>
+      For <em>semilinear PDEs</em> with stiff linear part (e.g. diffusion or
+      dispersive operators) and nonlinear reaction/transport, exponential
+      integrators and splitting methods are the standard tools.
+    </li>
+  </ul>
+
+  <hr/>
+
+  <h3 id="sec-6-6-5">6.6.5 Hybrid Geometric Schemes and Practical Guidelines</h3>
+
+  <p>
+    Modern SOTA codes often blend splitting, Magnus/CFM, and exponential ideas
+    to balance structure preservation, efficiency, and robustness.
+  </p>
+
+  <h4>Examples of hybrid strategies</h4>
+
+  <ul>
+    <li>
+      <strong>Hamiltonian NLS and wave equations.</strong><br/>
+      Use a spectral splitting for the linear dispersive part (Section 6.5),
+      combined with exponential-type treatment of additional linear potentials
+      or damping; nonlinearity handled via exact pointwise exponential flow.
+    </li>
+    <li>
+      <strong>Time-dependent Hamiltonians (quantum dynamics).</strong><br/>
+      Use CFM Magnus integrators to maintain unitarity while handling
+      time-dependent fields, possibly within each Magnus step applying FFT-based
+      techniques to exploit structure in \(A(t)\).
+    </li>
+    <li>
+      <strong>Non-autonomous Hamiltonian ODEs.</strong><br/>
+      Lift to extended phase space, apply symplectic splitting there (Section 7),
+      with coefficients inspired by Magnus truncations to achieve high order
+      and time symmetry.
+    </li>
+    <li>
+      <strong>Semilinear parabolic PDEs.</strong><br/>
+      Combine exponential integrators (for stiff linear part) with splitting in
+      the nonlinear part (e.g. reaction vs convection) and possibly with
+      complex-coefficient steps satisfying positivity constraints.
+    </li>
+  </ul>
+
+  <h4>Rule-of-thumb choice</h4>
+
+  <ul>
+    <li>
+      <em>Predominantly autonomous Hamiltonian / PDE:</em>  
+      Splitting and composition (including complex-coefficient schemes).
+    </li>
+    <li>
+      <em>Non-autonomous linear with strong time dependence, structure-critical:</em>  
+      Magnus / commutator-free Magnus (CFM).
+    </li>
+    <li>
+      <em>Semilinear stiff problems:</em>  
+      Exponential Runge–Kutta or exponential multistep, sometimes combined
+      with splitting in the nonlinear part.
+    </li>
+    <li>
+      <em>Mixed or highly structured systems:</em>  
+      Hybrid designs that treat the most structured pieces with splitting/CFM
+      and the remainder with exponential integrators.
+    </li>
+  </ul>
+
+  <p>
+    From the geometric standpoint, all these methods are variations on a single
+    theme: construct a discrete flow as a product of exponentials whose BCH
+    logarithm approximates the exact generator in a way that respects
+    invariants, symmetries, and qualitative structure.
+  </p>
+
+  <hr/>
+
+  <h3 id="sec-6-6-6">6.6.6 References for Section 6.6</h3>
+
+  <ol>
+    <li>
+      E. Hairer, C. Lubich, G. Wanner,
+      <em>Geometric Numerical Integration</em>, 2nd ed., Springer, 2006.
+      (Chs. II, IV, IX: splitting, Magnus, and exponential integrators.)
+    </li>
+    <li>
+      S. Blanes, F. Casas,
+      <em>A Concise Introduction to Geometric Numerical Integration</em>, 2nd ed.,
+      Chapman &amp; Hall/CRC, 2026. (Chs. 4–6: Magnus and commutator-free methods.)
+    </li>
+    <li>
+      S. Blanes, F. Casas, J.A. Oteo, J. Ros,
+      “The Magnus expansion and some of its applications,”
+      <em>Physics Reports</em> 470 (2009), 151–238.
+    </li>
+    <li>
+      M. Hochbruck, A. Ostermann,
+      “Exponential integrators,”
+      <em>Acta Numerica</em> 19 (2010), 209–286.
+    </li>
+  </ol>
+
+</section>
+
+
+
+</html><hr />
+<nav style="background:#eee; padding:0.5em; margin-top:1em;">
+    <a href="chapter05.html">Previous</a> | <a href="toc.html">Table of Contents</a> | <a href="chapter07.html">Next</a>
+</nav>
+</body>
+
+</html>

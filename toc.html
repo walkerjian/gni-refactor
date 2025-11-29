@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Extended Introduction to Geometric Numerical Integration</title>
+    <style>
+        body {
+            font-family: serif;
+            line-height: 1.5;
+            margin: 2em;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: Georgia, serif;
+        }
+
+        code {
+            background: #eee;
+            padding: 2px 4px;
+        }
+
+        .task {
+            color: #777;
+            font-style: italic;
+        }
+
+        a {
+            text-decoration: none;
+            color: #006;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Geometric Numerical Integration — Rigorous Extended Introduction</h1>
+    <h2>Based on Blanes & Casas (2026), with Expanded Exposition</h2>
+
+    <hr />
+
+    <h1>Table of Contents</h1>
+
+    <ul>
+        <li><a href="chapter01.html">1. Foundations of Geometric Numerical Integration</a>
+            <ul>
+                <li><a href="chapter01.html#sec-1-1">1.1 What is Geometric Numerical Integration?</a></li>
+                <li><a href="chapter01.html#sec-1-2">1.2 Fundamental Objects in Differential Equations</a></li>
+                <li><a href="chapter01.html#sec-1-3">1.3 The Geometry of Flows</a></li>
+            </ul>
+        </li>
+        <li><a href="chapter02.html">2. Symplectic Geometry and Hamiltonian Dynamics</a>
+            <ul>
+                <li><a href="chapter02.html#sec-2-1">2.1 Symplectic Manifolds</a></li>
+                <li><a href="chapter02.html#sec-2-2">2.2 Hamiltonian Vector Fields and Poisson Brackets</a></li>
+                <li><a href="chapter02.html#sec-2-3">2.3 Symmetries, Momentum Maps, and Noether’s Theorem</a></li>
+                <li><a href="chapter02.html#sec-2-4">2.4 Poisson Manifolds and Poisson Brackets</a></li>
+                <li><a href="chapter02.html#sec-2-5">2.5 Darboux’s Theorem and Canonical Coordinates</a></li>
+                <li><a href="chapter02.html#sec-2-6">2.6 Lie–Poisson Reduction and Coadjoint Orbits</a></li>
+            </ul>
+        </li>
+        <li><a href="chapter03.html">3. Symplectic Integrators for Hamiltonian Systems</a>
+            <ul>
+                <li><a href="chapter03.html#sec-3-1">3.1 Why Symplectic Integrators?</a></li>
+                <li><a href="chapter03.html#sec-3-2">3.2 Symplectic Euler, Störmer–Verlet, and Basic Symplectic
+                        Schemes</a></li>
+                <li><a href="chapter03.html#sec-3-3">3.3 Variational Integrators and Discrete Lagrangian Mechanics</a>
+                </li>
+                <li><a href="chapter03.html#sec-3-4">3.4 Splitting Methods and Composition Techniques</a></li>
+                <li><a href="chapter03.html#sec-3-5">3.5 Backward Error Analysis and Modified Equations</a></li>
+                <li><a href="chapter03.html#sec-3-6">3.6 Symmetric Methods, Processing, and Modified Flow Techniques</a>
+                </li>
+                <li><a href="chapter03.html#sec-3-7">3.7 Symplectic Runge–Kutta and Partitioned Runge–Kutta Methods</a>
+                </li>
+                <li><a href="chapter03.html#sec-3-8">3.8 Energy-Preserving and Volume-Preserving Integrators</a></li>
+            </ul>
+        </li>
+        <li><a href="chapter04.html">4. Splitting and Composition Methods</a>
+            <ul>
+                <li><a href="chapter04.html#sec-4-1">4.1 Lie–Trotter and Strang Splitting</a></li>
+                <li><a href="chapter04.html#sec-4-2">4.2 Higher-Order Splitting via Composition</a></li>
+                <li><a href="chapter04.html#sec-4-3">4.3 Optimised Splitting Methods</a></li>
+                <li><a href="chapter04.html#sec-4-4">4.4 Splitting Methods for Time-Dependent and Non-Autonomous
+                        Systems</a></li>
+                <li><a href="chapter04.html#sec-4-5">4.5 High-Order Composition & Optimised Non-Autonomous Schemes</a>
+                </li>
+            </ul>
+        </li>
+        <li><a href="chapter05.html">5. Exponential Integrators and Magnus Expansions</a>
+            <ul>
+                <li><a href="chapter05.html#sec-5-1">5.1 Symplectic Runge–Kutta Methods</a></li>
+                <!-- Note: Title mismatch in grep? 5.1 in grep was Symplectic RK. Wait, grep said 5.1 Symplectic Runge-Kutta. Original TOC said Exponential Map. I will use Grep content. -->
+                <li><a href="chapter05.html#sec-5-2">5.2 Algebraic Order Conditions and B-Series for Symplectic RK
+                        Methods</a></li>
+                <li><a href="chapter05.html#sec-5-3">5.3 Symmetric, Symplectic, and Energy-Preserving RK Methods</a>
+                </li>
+                <li><a href="chapter05.html#sec-5-4">5.4 Partitioned and Symplectic Partitioned Runge–Kutta Methods</a>
+                </li>
+                <li><a href="chapter05.html#sec-5-5">5.5 Exponential Runge–Kutta (ERK), Lawson, and Integrating Factor
+                        Methods</a></li>
+                <li><a href="chapter05.html#sec-5-6">5.6 Magnus–Runge–Kutta, Commutator-Free Magnus Methods, and
+                        Lie–Algebraic Exponential Integrators</a></li>
+            </ul>
+        </li>
+        <li><a href="chapter06.html">6. Backward Error Analysis (BEA)</a>
+            <ul>
+                <li><a href="chapter06.html#sec-6-0">6.0 Overview: Why Splitting & Composition Methods?</a></li>
+                <li><a href="chapter06.html#sec-6-1">6.1 Lie and Strang Splitting</a></li>
+                <li><a href="chapter06.html#sec-6-2">6.2 Symmetric Composition Methods: From Strang to High Order</a>
+                </li>
+                <li><a href="chapter06.html#sec-6-3">6.3 Optimised High-Order Splitting Methods: Real & Complex
+                        Coefficients</a></li>
+                <li><a href="chapter06.html#sec-6-4">6.4 Backward Error Analysis for Splitting Methods</a></li>
+                <li><a href="chapter06.html#sec-6-5">6.5 Splitting Methods for PDEs</a></li>
+                <li><a href="chapter06.html#sec-6-6">6.6 Relation of Splitting to Magnus Methods and Exponential
+                        Integrators</a></li>
+            </ul>
+        </li>
+        <li><a href="chapter07.html">7. Geometric Integrators for Non-Autonomous Systems (NEW)</a> [Placeholder]</li>
+        <li><a href="chapter08.html">8. Lie-Group Methods and Manifold Integrators</a> [Placeholder]</li>
+        <li><a href="chapter09.html">9. Geometric Methods for PDEs (EXPANDED in 2nd Edition)</a> [Placeholder]</li>
+        <li><a href="chapter10.html">10. Applications Highlighted in 2nd Edition</a> [Placeholder]</li>
+        <li><a href="chapter11.html">11. Advanced Topics and Research Directions</a> [Placeholder]</li>
+        <li><a href="chapter12.html">12. Appendix: Mathematical Tools</a> [Placeholder]</li>
+    </ul>
+
+</body>
+
+</html>
